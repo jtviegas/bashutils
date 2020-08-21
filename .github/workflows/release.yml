@@ -18,8 +18,8 @@ jobs:
       uses: svenstaro/upload-release-action@v2
       with:
         repo_token: ${{ secrets.GITHUB_TOKEN }}
-        file: $TAR_FILE
+        file: ${{ TAR_FILE }}
         tag: ${{ github.ref }}
-        asset_name: $ASSET_NAME
+        asset_name: ${{ ASSET_NAME }}
         overwrite: true
 
