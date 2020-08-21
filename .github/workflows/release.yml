@@ -12,14 +12,11 @@ jobs:
     - name: package
       run: ./helper.sh package
     - name: create release
-      env:
-        TAR_FILE: utils.tar.bz2
-        ASSET_NAME: bashutils
       uses: svenstaro/upload-release-action@v2
       with:
         repo_token: ${{ secrets.GITHUB_TOKEN }}
-        file: ${{ TAR_FILE }}
+        file: utils.tar.bz2
         tag: ${{ github.ref }}-${{ GITHUB_SHA }}
-        asset_name: ${{ ASSET_NAME }}
+        asset_name: bashutils
         overwrite: true
 
