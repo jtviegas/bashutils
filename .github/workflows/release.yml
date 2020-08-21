@@ -9,6 +9,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v2
+    - name: get timestamp
+      id: timestamp
+      run: echo "::set-output name=ts::$(date +'%Y%m%d%H%M%S')"
     - name: package
       run: ./helper.sh package
     - name: create release
@@ -16,7 +19,7 @@ jobs:
       with:
         repo_token: ${{ secrets.GITHUB_TOKEN }}
         file: utils.tar.bz2
-        tag: ${{ github.ref }}-${{ github.sha }}
-        asset_name: bashutils
+        tag: utils-${{ steps.timestamp.outputs.ts }}
+        asset_name: utils.tar.bz2
         overwrite: true
 
