@@ -11,7 +11,7 @@ jobs:
     - uses: actions/checkout@v2
     - name: get timestamp
       id: timestamp
-      run: echo "::set-output name=ts::$(date +'%Y%m%d%H%M%S')"
+      run: echo "::set-output name=ts::$(date +'%y%m%d%H%M%S')"
     - name: package
       run: ./helper.sh package
     - name: create release
