@@ -148,11 +148,12 @@ zip_js_lambda_function(){
   _pwd=`pwd`
   cd "$src_dir"
 
-  npm install &>/dev/null
-  if [ ! "$?" -eq "0" ] ; then err "[zip_js_lambda_function] could not install dependencies" && cd "$_pwd" && return 1; fi
-  if [ -d "${AWS_SDK_MODULE_PATH}" ]; then
-      rm -rf "$AWS_SDK_MODULE_PATH"
+  if [ -f "package.json" ]; then
+    npm install &>/dev/null
+    if [ ! "$?" -eq "0" ] ; then err "[zip_js_lambda_function] could not install dependencies" && cd "$_pwd" && return 1; fi
+    if [ -d "${AWS_SDK_MODULE_PATH}" ]; then rm -r "$AWS_SDK_MODULE_PATH"; fi
   fi
+
   rm -f "$zip_file"
   zip -9 -q -r "$zip_file" "$files" &>/dev/null
   if [ ! "$?" -eq "0" ] ; then err "[zip_js_lambda_function] could not zip it" && cd "$_pwd" && return 1; fi
