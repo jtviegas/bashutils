@@ -35,7 +35,11 @@ fi
 
 ## usage
 
-- add the include section in your bash script
+...one can include a script snippet to retrieve and source `bashutils.inc` dynamically, 
+so that it gets downloaded each time, or we can add a function in our scripts to 
+update it whenever we need.
+
+- add the include section in your bash script to get `bashutils.inc` dynamically
 ```
 #!/usr/bin/env bash
 
@@ -61,3 +65,22 @@ cd "$_pwd"
 # --- END include bashutils SECTION ---
 ```
 
+- add script function to update `bashutils.inc` whenever we need
+```
+update_bashutils(){
+  echo "[update_bashutils] ..."
+
+  _pwd=`pwd`
+  cd "$this_folder"
+
+  curl -s https://api.github.com/repos/tgedr/bashutils/releases/latest \
+  | grep "browser_download_url.*utils\.tar\.bz2" \
+  | cut -d '"' -f 4 | wget -qi -
+  tar xjpvf utils.tar.bz2
+  if [ ! "$?" -eq "0" ] ; then echo "[update_bashutils] could not untar it" && cd "$_pwd" && return 1; fi
+  rm utils.tar.bz2
+
+  cd "$_pwd"
+  echo "[update_bashutils] ...done."
+}
+```
