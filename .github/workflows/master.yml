@@ -1,0 +1,24 @@
+name: release build, test & publish
+
+on:
+  push:
+    branches: [ master ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - name: package
+      run: ./helper.sh package
+    - name: create release
+      env:
+        TAR_FILE: utils.tar.bz2
+        ASSET_NAME: bashutils
+      uses: svenstaro/upload-release-action@v2
+      with:
+        repo_token: ${{ secrets.GITHUB_TOKEN }}
+        file: $TAR_FILE
+        asset_name: $ASSET_NAME
+        overwrite: true
+
