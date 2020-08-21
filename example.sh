@@ -23,37 +23,43 @@ rm utils.tar.bz2
 cd "$_pwd"
 # --- END include bashutils SECTION ---
 
+update_bashutils(){
+  echo "[update_bashutils] ..."
+
+  _pwd=`pwd`
+  cd "$this_folder"
+
+  curl -s https://api.github.com/repos/tgedr/bashutils/releases/latest \
+  | grep "browser_download_url.*utils\.tar\.bz2" \
+  | cut -d '"' -f 4 | wget -qi -
+  tar xjpvf utils.tar.bz2
+  if [ ! "$?" -eq "0" ] ; then echo "[update_bashutils] could not untar it" && cd "$_pwd" && return 1; fi
+  rm utils.tar.bz2
+
+  cd "$_pwd"
+  echo "[update_bashutils] ...done."
+}
+
 usage() {
   cat <<EOM
   usage:
   $(basename $0) {
-          publish
-        | package_bashutils
-        | prereqs [command, ...]
+          update_bashutils
         }
 
-      - package_bashutils: for the github action to make a release
-      - publish: publishes to npm
-      - prereqs: checks if the pre-required commands/tools are available in the system
+      - update_bashutils: updates the lib
 
 EOM
   exit 1
 }
 
-verify
 
 debug "1: $1 2: $2 3: $3 4: $4 5: $5 6: $6 7: $7 8: $8 9: $9"
 
 
 case "$1" in
-  publish)
-    publish
-    ;;
-  package_bashutils)
-    package_bashutils
-    ;;
-  prereqs)
-    prereqs "${@:2}"
+  update_bashutils)
+    update_bashutils
     ;;
   *)
     usage
