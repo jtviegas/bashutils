@@ -130,3 +130,33 @@ terraform_autodestroy(){
   cd "$_pwd"
   info "[terraform_autodestroy] ...done."
 }
+
+zip_js_lambda_function(){
+  info "[zip_js_lambda_function] ...( $@ )"
+  local usage_msg=$'zip_js_lambda_function: zips a js lambda function:\nusage:\n    zip_js_lambda_function SRC_DIR ZIP_FILE { FILES FOLDERS ... }'
+
+  verify_prereqs npm
+  if [ ! "$?" -eq "0" ] ; then return 1; fi
+
+  if [ -z "$3" ] ; then echo "$usage_msg" && return 1; fi
+
+  local src_dir="$1"
+  local zip_file="$2"
+  local files="${@:3}"
+  local AWS_SDK_MODULE_PATH=$src_dir/node_modules/aws-sdk
+
+  _pwd=`pwd`
+  cd "$src_dir"
+
+  npm install &>/dev/null
+  if [ ! "$?" -eq "0" ] ; then err "[zip_js_lambda_function] could not install dependencies" && cd "$_pwd" && return 1; fi
+  if [ -d "${AWS_SDK_MODULE_PATH}" ]; then
+      rm -rf "$AWS_SDK_MODULE_PATH"
+  fi
+  rm -f "$zip_file"
+  zip -9 -q -r "$zip_file" "$files" &>/dev/null
+  if [ ! "$?" -eq "0" ] ; then err "[zip_js_lambda_function] could not zip it" && cd "$_pwd" && return 1; fi
+
+  cd "$_pwd"
+  info "[zip_js_lambda_function] ...done."
+}
