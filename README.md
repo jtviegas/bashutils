@@ -1,6 +1,23 @@
 # bashutils
 bash scripting utils
 
+## Notes
+
+the script tries to include variables and secrets through the files `variables.inc` and `secrets.inc` in its folder:
+```
+if [ ! -f "$this_folder/variables.inc" ]; then
+  warn "we DON'T have a 'variables.inc' file"
+else
+  . "$this_folder/variables.inc"
+fi
+
+if [ ! -f "$this_folder/secrets.inc" ]; then
+  warn "we DON'T have a 'secrets.inc' file"
+else
+  . "$this_folder/secrets.inc"
+fi
+``` 
+
 ## usage
 
 - download it
