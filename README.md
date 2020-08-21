@@ -13,7 +13,7 @@ curl -s https://api.github.com/repos/tgedr/bashutils/releases/latest \
 ```
 tar xjpvf utils.tar.bz2
 ```
-- run it
+- use it
 ```
 ./bashutils.sh
 ```
