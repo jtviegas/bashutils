@@ -16,7 +16,7 @@ jobs:
       with:
         repo_token: ${{ secrets.GITHUB_TOKEN }}
         file: utils.tar.bz2
-        tag: ${{ github.ref }}-${{ GITHUB_SHA }}
+        tag: ${{ github.ref }}-${{ github.sha }}
         asset_name: bashutils
         overwrite: true
 
