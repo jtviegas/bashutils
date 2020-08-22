@@ -167,6 +167,8 @@ get_function_release(){
   local usage_msg=$'get_function_release: retrieves a function release artifact from github:\nusage:\n    get_function_release REPO ARTIFACT'
 
   if [ -z "$2" ] ; then echo "$usage_msg" && return 1; fi
+  local repo="$1"
+  local artifact="$2"
 
   _pwd=`pwd`
   cd "$this_folder"
@@ -176,5 +178,5 @@ get_function_release(){
   | cut -d '"' -f 4 | wget -qi -
 
   cd "$_pwd"
-  echo "[get_function_release] ...done."
+  info "[get_function_release] ...done."
 }
