@@ -161,3 +161,20 @@ zip_js_lambda_function(){
   cd "$_pwd"
   info "[zip_js_lambda_function] ...done."
 }
+
+get_function_release(){
+  info "[get_function_release] ...( $@ )"
+  local usage_msg=$'get_function_release: retrieves a function release artifact from github:\nusage:\n    get_function_release REPO ARTIFACT'
+
+  if [ -z "$2" ] ; then echo "$usage_msg" && return 1; fi
+
+  _pwd=`pwd`
+  cd "$this_folder"
+
+  curl -s "https://api.github.com/repos/${repo}/releases/latest" \
+  | grep "browser_download_url.*${artifact}" \
+  | cut -d '"' -f 4 | wget -qi -
+
+  cd "$_pwd"
+  echo "[get_function_release] ...done."
+}
