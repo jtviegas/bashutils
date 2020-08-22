@@ -1,3 +1,4 @@
+![release](https://github.com/tgedr/bashutils/workflows/release/badge.svg?branch=master)
 # bashutils
 bash scripting utils include file
 
