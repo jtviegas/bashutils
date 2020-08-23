@@ -225,63 +225,6 @@ delete_terraform_modules() {
   info "[delete_terraform_modules|out] ...done."
 }
 
-tf_state_on() {
-  info "[tf_state_on|in] ...( $@ )"
-  local usage_msg=$'tf_state_on: sets up terraform remote state for a project:\nusage:\n    tf_state_on TF_LOCAL_ROOT_DIR TF_LOCAL_STATE_DIR MODULES_URL APPLICATION ENVIRONMENT'
-
-  verify_env AWS_REGION
-  if [ ! "$?" -eq "0" ] ; then return 1; fi
-
-  if [ -z "$5" ] ; then echo "$usage_msg" && return 1; fi
-  local root_dir="$1"
-  local state_dir="$2"
-  local modules_url="$3"
-  local application="$4"
-  local environment="$5"
-
-  get_terraform_modules "$modules_url" "$root_dir"
-  if [ ! "$?" -eq "0" ]; then err "[tf_state_on] could not get terraform modules" && return 1; fi
-
-  export TF_VAR_region="$AWS_REGION"
-  export TF_VAR_app="$application"
-  export TF_VAR_env="$environment"
-
-  terraform_autodeploy "$state_dir"
-  local outcome=$?
-  rm -r "$root_dir/$DEFAULT_TF_MODULES_DIR_NAME"
-  if [ ! "$outcome" -eq "0" ]; then err "[tf_state_on] could not setup terraform remote state" && return 1; fi
-
-  info "[tf_state_on] ...done."
-}
-
-tf_state_off() {
-  info "[tf_state_off|in] ...( $@ )"
-  local usage_msg=$'tf_state_off: deletes terraform remote state for a project:\nusage:\n    tf_state_off TF_LOCAL_ROOT_DIR TF_LOCAL_STATE_DIR MODULES_URL APPLICATION ENVIRONMENT'
-
-  verify_env AWS_REGION DEFAULT_TF_MODULES_DIR_NAME
-  if [ ! "$?" -eq "0" ] ; then return 1; fi
-
-  if [ -z "$5" ] ; then echo "$usage_msg" && return 1; fi
-  local root_dir="$1"
-  local state_dir="$2"
-  local modules_url="$3"
-  local application="$4"
-  local environment="$5"
-
-  get_terraform_modules "$modules_url" "$root_dir"
-  if [ ! "$?" -eq "0" ]; then err "[tf_state_off] could not get terraform modules" && return 1; fi
-
-  export TF_VAR_region="$AWS_REGION"
-  export TF_VAR_app="$application"
-  export TF_VAR_env="$environment"
-
-  terraform_autodestroy "$state_dir"
-  local outcome=$?
-  rm -r "$root_dir/$DEFAULT_TF_MODULES_DIR_NAME"
-  if [ ! "$outcome" -eq "0" ]; then err "[tf_state_off] could not delete terraform remote state" && return 1; fi
-
-  info "[tf_state_off] ...done."
-}
 
 create_from_template_and_envvars() {
   info "[create_from_template_and_envvars] ...( $@ )"
@@ -390,5 +333,53 @@ tf_resources_off() {
   if [ ! "$?" -eq "0" ]; then err "[tf_resources_off] could not destroy terraform resources" && return 1; fi
 
   info "[tf_resources_off|out] ...done."
+}
+
+tf_state_on() {
+  info "[tf_state_on|in] ...( $@ )"
+  local usage_msg=$'tf_state_on: sets up terraform remote state for a project:\nusage:\n    required environment variables:\n    AWS_REGION TERRAFORM_DIR TERRAFORM_STATE_DIR MODULES_URL APPLICATION ENVIRONMENT DEFAULT_TF_MODULES_DIR_NAME\n    tf_state_on'
+
+  verify_env AWS_REGION TERRAFORM_DIR TERRAFORM_STATE_DIR MODULES_URL APPLICATION ENVIRONMENT DEFAULT_TF_MODULES_DIR_NAME
+  if [ ! "$?" -eq "0" ] ; then echo "$usage_msg" && return 1; fi
+
+  local tf_dir="$this_folder/$TERRAFORM_DIR"
+  local state_dir="$this_folder/$TERRAFORM_STATE_DIR"
+
+  delete_terraform_modules "$tf_dir"
+  get_terraform_modules "$MODULES_URL" "$tf_dir"
+  if [ ! "$?" -eq "0" ]; then err "[tf_state_on] could not get terraform modules" && return 1; fi
+
+  export TF_VAR_region="$AWS_REGION"
+  export TF_VAR_app="$APPLICATION"
+  export TF_VAR_env="$ENVIRONMENT"
+
+  terraform_autodeploy "$state_dir"
+  if [ ! "$?" -eq "0" ]; then err "[tf_state_on] could not setup terraform remote state" && return 1; fi
+
+  info "[tf_state_on|out] ...done."
+}
+
+tf_state_off() {
+  info "[tf_state_off|in] ...( $@ )"
+  local usage_msg=$'tf_state_off: deletes terraform remote state for a project:\nusage:\n    required environment variables:\n    AWS_REGION TERRAFORM_DIR TERRAFORM_STATE_DIR MODULES_URL APPLICATION ENVIRONMENT DEFAULT_TF_MODULES_DIR_NAME\n    tf_state_off'
+
+  verify_env AWS_REGION TERRAFORM_DIR TERRAFORM_STATE_DIR MODULES_URL APPLICATION ENVIRONMENT DEFAULT_TF_MODULES_DIR_NAME
+  if [ ! "$?" -eq "0" ] ; then echo "$usage_msg" && return 1; fi
+
+  local tf_dir="$this_folder/$TERRAFORM_DIR"
+  local state_dir="$this_folder/$TERRAFORM_STATE_DIR"
+
+  delete_terraform_modules "$tf_dir"
+  get_terraform_modules "$MODULES_URL" "$tf_dir"
+  if [ ! "$?" -eq "0" ]; then err "[tf_state_off] could not get terraform modules" && return 1; fi
+
+  export TF_VAR_region="$AWS_REGION"
+  export TF_VAR_app="$APPLICATION"
+  export TF_VAR_env="$ENVIRONMENT"
+
+  terraform_autodestroy "$state_dir"
+  if [ ! "$?" -eq "0" ]; then err "[tf_state_off] could not delete terraform remote state" && return 1; fi
+
+  info "[tf_state_off|out] ...done."
 }
 
