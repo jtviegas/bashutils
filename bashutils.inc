@@ -1,6 +1,9 @@
 # http://bash.cumulonim.biz/NullGlob.html
 shopt -s nullglob
 
+# ---------- CONSTANTS ----------
+export DEFAULT_TF_MODULES_DIR_NAME=modules
+# -------------------------------
 
 if [ -z "$this_folder" ]; then
   this_folder="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
@@ -179,4 +182,82 @@ get_function_release(){
 
   cd "$_pwd"
   info "[get_function_release] ...done."
+}
+
+get_terraform_modules() {
+  info "[get_terraform_modules|in] ...( $@ )"
+  local usage_msg=$'get_terraform_modules: downloads terraform modules from a github repo:\nusage:\n    get_terraform_modules MODULES_URL DESTINATION_DIR'
+
+  if [ -z "$2" ] ; then echo "$usage_msg" && return 1; fi
+  local url="$1"
+  local folder="$2"
+
+  verify_prereqs svn
+  if [ ! "$?" -eq "0" ] ; then return 1; fi
+
+  local _pwd=$(pwd)
+  cd "$folder"
+  svn export -q "$url" "$DEFAULT_TF_MODULES_DIR_NAME"
+  if [ ! "$?" -eq "0" ]; then err "[get_terraform_modules] could not download terraform modules" && cd "$_pwd" && return 1; fi
+
+  cd "$_pwd"
+  info "[get_terraform_modules|out] ...done."
+}
+
+tf_state_on() {
+  info "[tf_state_on|in] ...( $@ )"
+  local usage_msg=$'tf_state_on: sets up terraform remote state for a project:\nusage:\n    tf_state_on TF_LOCAL_ROOT_DIR TF_LOCAL_STATE_DIR MODULES_URL APPLICATION ENVIRONMENT'
+
+  verify_env AWS_REGION
+  if [ ! "$?" -eq "0" ] ; then return 1; fi
+
+  if [ -z "$5" ] ; then echo "$usage_msg" && return 1; fi
+  local root_dir="$1"
+  local state_dir="$2"
+  local modules_url="$3"
+  local application="$4"
+  local environment="$5"
+
+  get_terraform_modules "$modules_url" "$root_dir"
+  if [ ! "$?" -eq "0" ]; then err "[tf_state_on] could not get terraform modules" && return 1; fi
+
+  export TF_VAR_region="$AWS_REGION"
+  export TF_VAR_app="$application"
+  export TF_VAR_env="$environment"
+
+  terraform_autodeploy "$state_dir"
+  local outcome=$?
+  rm -r "$root_dir/$DEFAULT_TF_MODULES_DIR_NAME"
+  if [ ! "$outcome" -eq "0" ]; then err "[tf_state_on] could not setup terraform remote state" && return 1; fi
+
+  info "[tf_state_on] ...done."
+}
+
+tf_state_off() {
+  info "[tf_state_off|in] ...( $@ )"
+  local usage_msg=$'tf_state_off: deletes terraform remote state for a project:\nusage:\n    tf_state_off TF_LOCAL_ROOT_DIR TF_LOCAL_STATE_DIR MODULES_URL APPLICATION ENVIRONMENT'
+
+  verify_env AWS_REGION
+  if [ ! "$?" -eq "0" ] ; then return 1; fi
+
+  if [ -z "$5" ] ; then echo "$usage_msg" && return 1; fi
+  local root_dir="$1"
+  local state_dir="$2"
+  local modules_url="$3"
+  local application="$4"
+  local environment="$5"
+
+  get_terraform_modules "$modules_url" "$root_dir"
+  if [ ! "$?" -eq "0" ]; then err "[tf_state_off] could not get terraform modules" && return 1; fi
+
+  export TF_VAR_region="$AWS_REGION"
+  export TF_VAR_app="$application"
+  export TF_VAR_env="$environment"
+
+  terraform_autodestroy "$state_dir"
+  local outcome=$?
+  rm -r "$root_dir/$DEFAULT_TF_MODULES_DIR_NAME"
+  if [ ! "$outcome" -eq "0" ]; then err "[tf_state_off] could not delete terraform remote state" && return 1; fi
+
+  info "[tf_state_off] ...done."
 }
