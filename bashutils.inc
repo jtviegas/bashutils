@@ -192,6 +192,9 @@ get_terraform_modules() {
   local url="$1"
   local folder="$2"
 
+  verify_env DEFAULT_TF_MODULES_DIR_NAME
+  if [ ! "$?" -eq "0" ] ; then return 1; fi
+
   verify_prereqs svn
   if [ ! "$?" -eq "0" ] ; then return 1; fi
 
@@ -202,6 +205,24 @@ get_terraform_modules() {
 
   cd "$_pwd"
   info "[get_terraform_modules|out] ...done."
+}
+
+delete_terraform_modules() {
+  info "[delete_terraform_modules|in] ...( $@ )"
+  local usage_msg=$'delete_terraform_modules: deletes the previously downloaded terraform modules folder:\nusage:\n    delete_terraform_modules TF_BASE_DIR'
+
+  if [ -z "$1" ] ; then echo "$usage_msg" && return 1; fi
+  local folder="$1"
+
+  verify_env DEFAULT_TF_MODULES_DIR_NAME
+  if [ ! "$?" -eq "0" ] ; then return 1; fi
+
+  if [ -d "$folder/$DEFAULT_TF_MODULES_DIR_NAME" ]; then
+    rm -r "$folder/$DEFAULT_TF_MODULES_DIR_NAME"
+    if [ ! "$?" -eq "0" ]; then err "[delete_terraform_modules] could not delete terraform modules folder" && return 1; fi
+  fi
+
+  info "[delete_terraform_modules|out] ...done."
 }
 
 tf_state_on() {
@@ -237,7 +258,7 @@ tf_state_off() {
   info "[tf_state_off|in] ...( $@ )"
   local usage_msg=$'tf_state_off: deletes terraform remote state for a project:\nusage:\n    tf_state_off TF_LOCAL_ROOT_DIR TF_LOCAL_STATE_DIR MODULES_URL APPLICATION ENVIRONMENT'
 
-  verify_env AWS_REGION
+  verify_env AWS_REGION DEFAULT_TF_MODULES_DIR_NAME
   if [ ! "$?" -eq "0" ] ; then return 1; fi
 
   if [ -z "$5" ] ; then echo "$usage_msg" && return 1; fi
@@ -261,3 +282,45 @@ tf_state_off() {
 
   info "[tf_state_off] ...done."
 }
+
+create_from_template_and_envvars() {
+  info "[create_from_template_and_envvars] ...( $@ )"
+  local usage_msg=$'create_from_template_and_envvars: creates a file from a template substituting env vars:\nusage:\n    create_from_template_and_envvars TEMPLATE DESTINATION [ENVVARS...]'
+
+  if [ -z "$3" ] ; then echo "$usage_msg" && return 1; fi
+
+  local template="$1"
+  local destination="$2"
+  local vars="${@:3}"
+
+  local expression=""
+  for var in $vars
+  do
+    eval val=\${"$var"}
+    #echo "$var: $val"
+    expression="${expression}s/${var}/${val}/g;"
+  done
+
+  #echo "expression: $expression"
+  sed "${expression}" "$template" > "$destination"
+  if [ ! "$?" -eq "0" ]; then err "[create_from_template_and_envvars] sed command was not successful" && return 1; fi
+  info "[create_from_template_and_envvars] ...done."
+}
+
+download_function(){
+  info "[download_function|in] ...( $@ )"
+  local usage_msg=$'download_function: downloads a function release artifact from github:\nusage:\n    download_function REPO ARTIFACT DESTINATION_FILE'
+
+  if [ -z "$3" ] ; then echo "$usage_msg" && return 1; fi
+  local repo="$1"
+  local artifact="$2"
+  local file="$3"
+
+  curl -s "https://api.github.com/repos/${repo}/releases/latest" \
+  | grep "browser_download_url.*${artifact}" \
+  | cut -d '"' -f 4 | wget -O "$file" -qi  -
+  if [ ! "$?" -eq "0" ]; then err "[download_function] curl command was not successful" && return 1; fi
+
+  info "[download_function|out] ...done."
+}
+
