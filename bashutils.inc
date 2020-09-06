@@ -267,11 +267,11 @@ download_function(){
   info "[download_function|out] ...done."
 }
 
-tf_resources_on() {
-  info "[tf_resources_on|in] ...( $@ )"
-  local usage_msg=$'tf_resources_on: sets up terraform resources for a project:\nusage:\n    required environment variables:\n    AWS_REGION AWS_ACCOUNT_ID TERRAFORM_DIR TERRAFORM_RESOURCES_CONFIG TERRAFORM_RESOURCES_CONFIG_TEMPLATE TERRAFORM_RESOURCES_DIR APPLICATION ENVIRONMENT MODULES_URL FUNCTION_NAME FUNCTION_FILE FUNCTION_REPO\n    tf_resources_on'
+tf_resources_for_graphql_api_on() {
+  info "[tf_resources_for_graphql_api_on|in] ...( $@ )"
+  local usage_msg=$'tf_resources_for_graphql_api_on: sets up terraform resources for a graphql api project:\nusage:\n    required environment variables:\n    AWS_REGION TERRAFORM_DIR TERRAFORM_RESOURCES_CONFIG TERRAFORM_RESOURCES_CONFIG_TEMPLATE TERRAFORM_RESOURCES_DIR APPLICATION ENVIRONMENT MODULES_URL FUNCTION_NAME FUNCTION_FILE FUNCTION_REPO\n    tf_resources_for_graphql_api_on'
 
-  verify_env AWS_REGION AWS_ACCOUNT_ID TERRAFORM_DIR TERRAFORM_RESOURCES_CONFIG TERRAFORM_RESOURCES_CONFIG_TEMPLATE TERRAFORM_RESOURCES_DIR APPLICATION ENVIRONMENT MODULES_URL FUNCTION_NAME FUNCTION_FILE FUNCTION_REPO
+  verify_env AWS_REGION TERRAFORM_DIR TERRAFORM_RESOURCES_CONFIG TERRAFORM_RESOURCES_CONFIG_TEMPLATE TERRAFORM_RESOURCES_DIR APPLICATION ENVIRONMENT MODULES_URL FUNCTION_NAME FUNCTION_FILE FUNCTION_REPO
   if [ ! "$?" -eq "0" ] ; then return 1; fi
 
   local custom_tf_config="$this_folder/$TERRAFORM_RESOURCES_CONFIG"
@@ -284,30 +284,30 @@ tf_resources_on() {
 
   delete_terraform_modules "$tf_dir"
   get_terraform_modules "$MODULES_URL" "$tf_dir"
-  if [ ! "$?" -eq "0" ]; then err "[tf_resources_on] could not get terraform modules" && return 1; fi
+  if [ ! "$?" -eq "0" ]; then err "[tf_resources_for_graphql_api_on] could not get terraform modules" && return 1; fi
 
   if [ -f "$tf_resources_dir/$FUNCTION_FILE" ]; then rm "$tf_resources_dir/$FUNCTION_FILE";fi
   download_function "$FUNCTION_REPO" "$FUNCTION_FILE" "$tf_resources_dir/$FUNCTION_FILE"
-  if [ ! "$?" -eq "0" ]; then err "[tf_resources_on] could not download the function" && return 1; fi
+  if [ ! "$?" -eq "0" ]; then err "[tf_resources_for_graphql_api_on] could not download the function" && return 1; fi
 
   export TF_VAR_aws_region="$AWS_REGION"
   export TF_VAR_application="$APPLICATION"
   export TF_VAR_environment="$ENVIRONMENT"
   export TF_VAR_function="$FUNCTION_NAME"
   export TF_VAR_function_file="$FUNCTION_FILE"
-  export TF_VAR_aws_account_id="$AWS_ACCOUNT_ID"
+  #export TF_VAR_aws_account_id="$AWS_ACCOUNT_ID"
 
   terraform_autodeploy "$tf_resources_dir"
-  if [ ! "$?" -eq "0" ]; then err "[tf_resources_on] could not setup terraform resources" && return 1; fi
+  if [ ! "$?" -eq "0" ]; then err "[tf_resources_for_graphql_api_on] could not setup terraform resources" && return 1; fi
 
-  info "[tf_resources_on|out] ...done."
+  info "[tf_resources_for_graphql_api_on|out] ...done."
 }
 
-tf_resources_off() {
-  info "[tf_resources_off|in] ...( $@ )"
-  local usage_msg=$'tf_resources_off: destroys terraform resources for a project:\nusage:\n    required environment variables:\n    AWS_REGION AWS_ACCOUNT_ID TERRAFORM_DIR TERRAFORM_RESOURCES_CONFIG TERRAFORM_RESOURCES_CONFIG_TEMPLATE TERRAFORM_RESOURCES_DIR APPLICATION ENVIRONMENT MODULES_URL FUNCTION_NAME FUNCTION_FILE\n    tf_resources_off'
+tf_resources_for_graphql_api_off() {
+  info "[tf_resources_for_graphql_api_off|in] ...( $@ )"
+  local usage_msg=$'tf_resources_for_graphql_api_off: destroys terraform resources for a graphql api project:\nusage:\n    required environment variables:\n    AWS_REGION TERRAFORM_DIR TERRAFORM_RESOURCES_CONFIG TERRAFORM_RESOURCES_CONFIG_TEMPLATE TERRAFORM_RESOURCES_DIR APPLICATION ENVIRONMENT MODULES_URL FUNCTION_NAME FUNCTION_FILE\n    tf_resources_for_graphql_api_off'
 
-  verify_env AWS_REGION AWS_ACCOUNT_ID TERRAFORM_DIR TERRAFORM_RESOURCES_CONFIG TERRAFORM_RESOURCES_CONFIG_TEMPLATE TERRAFORM_RESOURCES_DIR APPLICATION ENVIRONMENT MODULES_URL FUNCTION_NAME FUNCTION_FILE
+  verify_env AWS_REGION TERRAFORM_DIR TERRAFORM_RESOURCES_CONFIG TERRAFORM_RESOURCES_CONFIG_TEMPLATE TERRAFORM_RESOURCES_DIR APPLICATION ENVIRONMENT MODULES_URL FUNCTION_NAME FUNCTION_FILE
   if [ ! "$?" -eq "0" ] ; then return 1; fi
 
   local custom_tf_config="$this_folder/$TERRAFORM_RESOURCES_CONFIG"
@@ -320,19 +320,19 @@ tf_resources_off() {
 
   delete_terraform_modules "$tf_dir"
   get_terraform_modules "$MODULES_URL" "$tf_dir"
-  if [ ! "$?" -eq "0" ]; then err "[tf_resources_on] could not get terraform modules" && return 1; fi
+  if [ ! "$?" -eq "0" ]; then err "[tf_resources_for_graphql_api_off] could not get terraform modules" && return 1; fi
 
   export TF_VAR_aws_region="$AWS_REGION"
   export TF_VAR_application="$APPLICATION"
   export TF_VAR_environment="$ENVIRONMENT"
   export TF_VAR_function="$FUNCTION_NAME"
   export TF_VAR_function_file="$FUNCTION_FILE"
-  export TF_VAR_aws_account_id="$AWS_ACCOUNT_ID"
+  #export TF_VAR_aws_account_id="$AWS_ACCOUNT_ID"
 
   terraform_autodestroy "$tf_resources_dir"
-  if [ ! "$?" -eq "0" ]; then err "[tf_resources_off] could not destroy terraform resources" && return 1; fi
+  if [ ! "$?" -eq "0" ]; then err "[tf_resources_for_graphql_api_off] could not destroy terraform resources" && return 1; fi
 
-  info "[tf_resources_off|out] ...done."
+  info "[tf_resources_for_graphql_api_off|out] ...done."
 }
 
 tf_state_on() {
