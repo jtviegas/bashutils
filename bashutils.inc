@@ -58,6 +58,12 @@ if [ ! -z "$ADDITIONAL_SECRETS" ]; then
   . "$ADDITIONAL_SECRETS"
 fi
 
+# contains <list> <item>
+# echo $? # 0： match, 1: failed
+contains() {
+    [[ $1 =~ (^|[[:space:]])$2($|[[:space:]]) ]] && return 0 || return 1
+}
+
 verify_prereqs(){
   info "[verify_prereqs] ..."
   for arg in "$@"
