@@ -1,0 +1,188 @@
+
+# contains <list> <item>
+# echo $? # 0： match, 1: failed
+contains() {
+    [[ $1 =~ (^|[[:space:]])$2($|[[:space:]]) ]] && return 0 || return 1
+}
+
+verify_prereqs(){
+  info "[verify_prereqs] ..."
+  for arg in "$@"
+  do
+      debug "[verify_prereqs] ... checking $arg"
+      which "$arg" 1>/dev/null
+      if [ ! "$?" -eq "0" ] ; then err "[verify_prereqs] please install $arg" && return 1; fi
+  done
+  info "[verify_prereqs] ...done."
+}
+
+verify_env(){
+  info "[verify_env] ..."
+  for arg in "$@"
+  do
+      debug "[verify_env] ... checking $arg"
+      if [ -z "$arg" ]; then err "[verify_env] please define env var: $arg" && return 1; fi
+  done
+  info "[verify_env] ...done."
+}
+
+package(){
+  info "[package] ..."
+  _pwd=`pwd`
+  cd "$this_folder"
+
+  tar cpvf "$TAR_NAME" "$INCLUDE_FILE"
+  if [ ! "$?" -eq "0" ] ; then err "[package] could not tar it" && cd "$_pwd" && return 1; fi
+
+  cd "$_pwd"
+  info "[package] ...done."
+}
+
+update_bashutils(){
+  echo "[update_bashutils] ..."
+
+  tar_file="${NAME}.tar.bz2"
+  _pwd=`pwd`
+  cd "$this_folder"
+
+  curl -s https://api.github.com/repos/tgedr/bashutils/releases/latest \
+  | grep "browser_download_url.*${NAME}\.tar\.bz2" \
+  | cut -d '"' -f 4 | wget -qi -
+  tar xjpvf $tar_file
+  if [ ! "$?" -eq "0" ] ; then echo "[update_bashutils] could not untar it" && cd "$_pwd" && return 1; fi
+  rm $tar_file
+
+  cd "$_pwd"
+  echo "[update_bashutils] ...done."
+}
+
+terraform_autodeploy(){
+  info "[terraform_autodeploy] ..."
+
+  [ -z $1 ] && err "[terraform_autodeploy] missing function argument FOLDER" && return 1
+  local folder="$1"
+
+  verify_prereqs terraform
+  if [ ! "$?" -eq "0" ] ; then return 1; fi
+
+  _pwd=$(pwd)
+  cd "$folder"
+
+  terraform init
+  terraform plan
+  terraform apply -auto-approve -lock=true -lock-timeout=10m
+  if [ ! "$?" -eq "0" ]; then err "[terraform_autodeploy] could not apply" && cd "$_pwd" && return 1; fi
+  cd "$_pwd"
+  info "[terraform_autodeploy] ...done."
+}
+
+terraform_autodestroy(){
+  info "[terraform_autodestroy] ..."
+
+  [ -z $1 ] && err "[terraform_autodestroy] missing function argument FOLDER" && return 1
+  local folder="$1"
+
+  verify_prereqs terraform
+  if [ ! "$?" -eq "0" ] ; then return 1; fi
+
+  _pwd=$(pwd)
+  cd "$folder"
+
+  terraform destroy -auto-approve -lock=true -lock-timeout=10m
+  if [ ! "$?" -eq "0" ]; then err "[terraform_autodestroy] could not apply" && cd "$_pwd" && return 1; fi
+  cd "$_pwd"
+  info "[terraform_autodestroy] ...done."
+}
+
+zip_js_lambda_function(){
+  info "[zip_js_lambda_function] ...( $@ )"
+  local usage_msg=$'zip_js_lambda_function: zips a js lambda function:\nusage:\n    zip_js_lambda_function SRC_DIR ZIP_FILE { FILES FOLDERS ... }'
+
+  verify_prereqs npm
+  if [ ! "$?" -eq "0" ] ; then return 1; fi
+
+  if [ -z "$3" ] ; then echo "$usage_msg" && return 1; fi
+
+  local src_dir="$1"
+  local zip_file="$2"
+  local files="${@:3}"
+  local AWS_SDK_MODULE_PATH=$src_dir/node_modules/aws-sdk
+
+  _pwd=`pwd`
+  cd "$src_dir"
+
+  if [ -f "package.json" ]; then
+    npm install &>/dev/null
+    if [ ! "$?" -eq "0" ] ; then err "[zip_js_lambda_function] could not install dependencies" && cd "$_pwd" && return 1; fi
+    if [ -d "${AWS_SDK_MODULE_PATH}" ]; then rm -r "$AWS_SDK_MODULE_PATH"; fi
+  fi
+
+  rm -f "$zip_file"
+  zip -9 -q -r "$zip_file" "$files" &>/dev/null
+  if [ ! "$?" -eq "0" ] ; then err "[zip_js_lambda_function] could not zip it" && cd "$_pwd" && return 1; fi
+
+  cd "$_pwd"
+  info "[zip_js_lambda_function] ...done."
+}
+
+get_function_release(){
+  info "[get_function_release] ...( $@ )"
+  local usage_msg=$'get_function_release: retrieves a function release artifact from github:\nusage:\n    get_function_release REPO ARTIFACT'
+
+  if [ -z "$2" ] ; then echo "$usage_msg" && return 1; fi
+  local repo="$1"
+  local artifact="$2"
+
+  _pwd=`pwd`
+  cd "$this_folder"
+
+  curl -s "https://api.github.com/repos/${repo}/releases/latest" \
+  | grep "browser_download_url.*${artifact}" \
+  | cut -d '"' -f 4 | wget -qi -
+
+  cd "$_pwd"
+  info "[get_function_release] ...done."
+}
+
+create_from_template_and_envvars() {
+  info "[create_from_template_and_envvars] ...( $@ )"
+  local usage_msg=$'create_from_template_and_envvars: creates a file from a template substituting env vars:\nusage:\n    create_from_template_and_envvars TEMPLATE DESTINATION [ENVVARS...]'
+
+  if [ -z "$3" ] ; then echo "$usage_msg" && return 1; fi
+
+  local template="$1"
+  local destination="$2"
+  local vars="${@:3}"
+
+  local expression=""
+  for var in $vars
+  do
+    eval val=\${"$var"}
+    #echo "$var: $val"
+    expression="${expression}s/${var}/${val}/g;"
+  done
+
+  #echo "expression: $expression"
+  sed "${expression}" "$template" > "$destination"
+  if [ ! "$?" -eq "0" ]; then err "[create_from_template_and_envvars] sed command was not successful" && return 1; fi
+  info "[create_from_template_and_envvars] ...done."
+}
+
+download_function(){
+  info "[download_function|in] ...( $@ )"
+  local usage_msg=$'download_function: downloads a function release artifact from github:\nusage:\n    download_function REPO ARTIFACT DESTINATION_FILE'
+
+  if [ -z "$3" ] ; then echo "$usage_msg" && return 1; fi
+  local repo="$1"
+  local artifact="$2"
+  local file="$3"
+
+  curl -s "https://api.github.com/repos/${repo}/releases/latest" \
+  | grep "browser_download_url.*${artifact}" \
+  | cut -d '"' -f 4 | wget -O "$file" -qi  -
+  if [ ! "$?" -eq "0" ]; then err "[download_function] curl command was not successful" && return 1; fi
+
+  info "[download_function|out] ...done."
+}
+
+
