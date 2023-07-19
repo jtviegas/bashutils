@@ -18,7 +18,7 @@ jobs:
       with:
         repo_token: ${{ secrets.GITHUB_TOKEN }}
         file: bashutils.tar.bz2
-        tag: bashutils-${RELEASE_TS}
+        tag: bashutils-${{ env.RELEASE_TS }}
         asset_name: bashutils.tar.bz2
         overwrite: true
 
