@@ -38,24 +38,6 @@ package(){
   info "[package] ...done."
 }
 
-update_bashutils(){
-  echo "[update_bashutils] ..."
-
-  tar_file="${NAME}.tar.bz2"
-  _pwd=`pwd`
-  cd "$this_folder"
-
-  curl -s https://api.github.com/repos/tgedr/bashutils/releases/latest \
-  | grep "browser_download_url.*${NAME}\.tar\.bz2" \
-  | cut -d '"' -f 4 | wget -qi -
-  tar xjpvf $tar_file
-  if [ ! "$?" -eq "0" ] ; then echo "[update_bashutils] could not untar it" && cd "$_pwd" && return 1; fi
-  rm $tar_file
-
-  cd "$_pwd"
-  echo "[update_bashutils] ...done."
-}
-
 terraform_autodeploy(){
   info "[terraform_autodeploy] ..."
 
