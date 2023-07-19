@@ -18,8 +18,8 @@ jobs:
       uses: svenstaro/upload-release-action@v2
       with:
         repo_token: ${{ secrets.GITHUB_TOKEN }}
-        file: utils.tar.bz2
-        tag: utils-${{ steps.timestamp.outputs.ts }}
-        asset_name: utils.tar.bz2
+        file: bashutils.tar.bz2
+        tag: bashutils-${{ steps.timestamp.outputs.ts }}
+        asset_name: bashutils.tar.bz2
         overwrite: true
 
