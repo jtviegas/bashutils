@@ -63,18 +63,24 @@ fi
 . ${this_folder}/${INCLUDE_FILE}
 
 # ---------- FUNCTIONS ----------
-hello_world(){
-  info "[hello_world] ..."
+
+update_bashutils(){
+  echo "[update_bashutils] ..."
+
+  tar_file="${NAME}.tar.bz2"
   _pwd=`pwd`
   cd "$this_folder"
 
-  info "hello world"
+  curl -s https://api.github.com/repos/tgedr/bashutils/releases/latest \
+  | grep "browser_download_url.*${NAME}\.tar\.bz2" \
+  | cut -d '"' -f 4 | wget -qi -
+  tar xjpvf $tar_file
+  if [ ! "$?" -eq "0" ] ; then echo "[update_bashutils] could not untar it" && cd "$_pwd" && return 1; fi
+  rm $tar_file
 
   cd "$_pwd"
-  info "[hello_world] ...done."
+  echo "[update_bashutils] ...done."
 }
-
-
 
 # -------------------------------
 # --- MAIN SECTION ---
@@ -84,7 +90,6 @@ usage() {
   usage:
   $(basename $0) { package }
 
-      - hello_world: says 'hello world'
       - package: tars the bashutils include file
       - update_bashutils: updates the include '.bashutils' file
 EOM
@@ -97,9 +102,6 @@ debug "1: $1 2: $2 3: $3 4: $4 5: $5 6: $6 7: $7 8: $8 9: $9"
 case "$1" in
   package)
     package
-    ;;
-  hello_world)
-    hello_world
     ;;
   update_bashutils)
     update_bashutils
