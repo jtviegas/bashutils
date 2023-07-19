@@ -1,6 +1,6 @@
 ![release](https://github.com/tgedr/bashutils/workflows/release/badge.svg?branch=master)
 # bashutils
-bash scripting utils include file
+bash scripting utils include file - how to use an `helper.sh` script powered by a `.bashutils` include file loaded with handy functions
 
 ## usage
 
