@@ -1,11 +1,11 @@
-![release](https://github.com/tgedr/bashutils/workflows/release/badge.svg?branch=master)
+![release](https://github.com/jtviegas/bashutils/workflows/release/badge.svg?branch=master)
 # bashutils
 bash scripting utils include file - how to use an `helper.sh` script powered by a `.bashutils` include file loaded with handy functions
 
 ## usage
 
 * download the `helper.sh` 
-    script: `wget https://raw.githubusercontent.com/tgedr/bashutils/master/helper.sh`
+    script: `wget https://raw.githubusercontent.com/jtviegas/bashutils/master/helper.sh`
 * make it executable: `chmod +x helper.sh`
 * update bashutils include file: `./helper.sh update_bashutils`
 

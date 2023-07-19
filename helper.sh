@@ -71,7 +71,7 @@ update_bashutils(){
   _pwd=`pwd`
   cd "$this_folder"
 
-  curl -s https://api.github.com/repos/tgedr/bashutils/releases/latest \
+  curl -s https://api.github.com/repos/jtviegas/bashutils/releases/latest \
   | grep "browser_download_url.*${NAME}\.tar\.bz2" \
   | cut -d '"' -f 4 | wget -qi -
   tar xjpvf $tar_file
