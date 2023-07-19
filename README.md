@@ -2,9 +2,39 @@
 # bashutils
 bash scripting utils include file
 
+## usage
+
+* download the `helper.sh` 
+    script: `wget https://raw.githubusercontent.com/tgedr/bashutils/master/helper.sh`
+* make it executable: `chmod +x helper.sh`
+* update bashutils include file: `./helper.sh update_bashutils`
+
+
+you should now see this when running `./helper.sh`:
+```
+ [DEBUG] Wed Jul 19 07:57:19 CEST 2023 ... 1:  2:  3:  4:  5:  6:  7:  8:  9:
+  usage:
+  helper.sh { package }
+
+      - package: tars the bashutils include file
+      - update_bashutils: updates the include '.bashutils' file
+```   
+
+and your local folder should have now:
+```
+% ls -altr
+total 24
+drwxr-xr-x  4 jotvi  staff   128 Jul 19 07:48 ..
+-rw-r--r--  1 jotvi  staff     0 Jul 19 07:51 .variables
+-rw-r--r--  1 jotvi  staff     0 Jul 19 07:51 .local_variables
+-rw-r--r--  1 jotvi  staff     0 Jul 19 07:51 .secrets
+-rwxr-xr-x  1 jotvi  staff  4974 Jul 19 07:55 .bashutils
+-rwxr-xr-x  1 jotvi  staff  2624 Jul 19 07:55 helper.sh
+drwxr-xr-x  7 jotvi  staff   224 Jul 19 07:56 .
+```
 ## Notes
 
-the script tries to include variables and secrets into the running environment through the files `.variables`, `.local_variables` and `.secrets` in this order:
+the script tries to include variables and secrets into the running environment through the files `.variables`, `.local_variables` (_for local user specific variables, should not be included in versioning_) and `.secrets` (_should not be included in versioning_) in this order:
 ```
 export FILE_VARIABLES=${FILE_VARIABLES:-".variables"}
 export FILE_LOCAL_VARIABLES=${FILE_LOCAL_VARIABLES:-".local_variables"}
@@ -31,60 +61,3 @@ else
   . "$this_folder/$FILE_SECRETS"
 fi
 ``` 
-
-## usage
-
-* download the `helper.sh` 
-    script: `wget https://raw.githubusercontent.com/tgedr/bashutils/master/helper.sh`
-* make it executable: `chmod +x helper.sh`
-* 
-   
-...one can include a script snippet to retrieve and source `bashutils.inc` dynamically, 
-so that it gets downloaded each time, or we can add a function in our scripts to 
-update it whenever we need.
-
-- add the include section in your bash script to get `bashutils.inc` dynamically
-```
-#!/usr/bin/env bash
-
-# http://bash.cumulonim.biz/NullGlob.html
-shopt -s nullglob
-
-this_folder="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
-if [ -z "$this_folder" ]; then
-  this_folder=$(dirname $(readlink -f $0))
-fi
-parent_folder=$(dirname "$this_folder")
-
-# --- START include bashutils SECTION ---
-_pwd=$(pwd)
-cd "$this_folder"
-curl -s https://api.github.com/repos/tgedr/bashutils/releases/latest \
-| grep "browser_download_url.*utils\.tar\.bz2" \
-| cut -d '"' -f 4 | wget -qi -
-tar xjpvf utils.tar.bz2
-rm utils.tar.bz2
-. "$this_folder/bashutils.inc"
-cd "$_pwd"
-# --- END include bashutils SECTION ---
-```
-
-- add script function to update `bashutils.inc` whenever we need
-```
-update_bashutils(){
-  echo "[update_bashutils] ..."
-
-  _pwd=`pwd`
-  cd "$this_folder"
-
-  curl -s https://api.github.com/repos/tgedr/bashutils/releases/latest \
-  | grep "browser_download_url.*utils\.tar\.bz2" \
-  | cut -d '"' -f 4 | wget -qi -
-  tar xjpvf utils.tar.bz2
-  if [ ! "$?" -eq "0" ] ; then echo "[update_bashutils] could not untar it" && cd "$_pwd" && return 1; fi
-  rm utils.tar.bz2
-
-  cd "$_pwd"
-  echo "[update_bashutils] ...done."
-}
-```
