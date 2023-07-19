@@ -101,6 +101,9 @@ case "$1" in
   hello_world)
     hello_world
     ;;
+  update_bashutils)
+    update_bashutils
+    ;;
   *)
     usage
     ;;

@@ -34,6 +34,11 @@ fi
 
 ## usage
 
+* download the `helper.sh` 
+    script: `wget https://raw.githubusercontent.com/tgedr/bashutils/master/helper.sh`
+* make it executable: `chmod +x helper.sh`
+* 
+   
 ...one can include a script snippet to retrieve and source `bashutils.inc` dynamically, 
 so that it gets downloaded each time, or we can add a function in our scripts to 
 update it whenever we need.
