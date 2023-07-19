@@ -107,5 +107,6 @@ dist
 .idea
 coverage
 .DS_Store
-secrets.inc
-utils.tar.bz2
+.secrets
+bashutils.tar.bz2
+.local_variables

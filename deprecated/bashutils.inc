@@ -64,6 +64,18 @@ contains() {
     [[ $1 =~ (^|[[:space:]])$2($|[[:space:]]) ]] && return 0 || return 1
 }
 
+package(){
+  info "[package] ..."
+  _pwd=`pwd`
+  cd "$this_folder"
+
+  tar cpvf "$TAR_NAME" "$MAIN_SCRIPT"
+  if [ ! "$?" -eq "0" ] ; then err "[package] could not tar it" && cd "$_pwd" && return 1; fi
+
+  cd "$_pwd"
+  info "[package] ...done."
+}
+
 verify_prereqs(){
   info "[verify_prereqs] ..."
   for arg in "$@"

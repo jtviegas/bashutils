@@ -4,35 +4,33 @@ bash scripting utils include file
 
 ## Notes
 
-the script tries to include variables and secrets through the files `variables.inc` and `secrets.inc` in its folder:
+the script tries to include variables and secrets into the running environment through the files `.variables`, `.local_variables` and `.secrets` in this order:
 ```
-if [ ! -f "$this_folder/variables.inc" ]; then
-  warn "we DON'T have a 'variables.inc' file"
+export FILE_VARIABLES=${FILE_VARIABLES:-".variables"}
+export FILE_LOCAL_VARIABLES=${FILE_LOCAL_VARIABLES:-".local_variables"}
+export FILE_SECRETS=${FILE_SECRETS:-".secrets"}
+
+if [ ! -f "$this_folder/$FILE_VARIABLES" ]; then
+  warn "we DON'T have a $FILE_VARIABLES variables file - creating it"
+  touch "$this_folder/$FILE_VARIABLES"
 else
-  . "$this_folder/variables.inc"
+  . "$this_folder/$FILE_VARIABLES"
 fi
 
-if [ ! -f "$this_folder/secrets.inc" ]; then
-  warn "we DON'T have a 'secrets.inc' file"
+if [ ! -f "$this_folder/$FILE_LOCAL_VARIABLES" ]; then
+  warn "we DON'T have a $FILE_LOCAL_VARIABLES variables file - creating it"
+  touch "$this_folder/$FILE_LOCAL_VARIABLES"
 else
-  . "$this_folder/secrets.inc"
+  . "$this_folder/$FILE_LOCAL_VARIABLES"
+fi
+
+if [ ! -f "$this_folder/$FILE_SECRETS" ]; then
+  warn "we DON'T have a $FILE_SECRETS secrets file - creating it"
+  touch "$this_folder/$FILE_SECRETS"
+else
+  . "$this_folder/$FILE_SECRETS"
 fi
 ``` 
-
-...this environment loading procedure can be extended if one provides the following environment variables:
-- `ADDITIONAL_VARIABLES` - the location of a file with additional environment variables to be sourced;
-- `ADDITIONAL_SECRETS` - the location of a file with additional secrets to be sourced;
-```
-if [ ! -z "$ADDITIONAL_VARIABLES" ]; then
-  debug "loading ADDITIONAL_VARIABLES"
-  . "$ADDITIONAL_VARIABLES"
-fi
-
-if [ ! -z "$ADDITIONAL_SECRETS" ]; then
-  debug "loading ADDITIONAL_SECRETS"
-  . "$ADDITIONAL_SECRETS"
-fi
-```
 
 ## usage
 
