@@ -10,7 +10,7 @@ jobs:
     steps:
     - uses: actions/checkout@v2
     - name: set timestamp
-      run: echo "$(date +'%y%m%d%H%M%S')" >> ${GITHUB_ENV}
+      run: echo "RELEASE_TS=$(date +'%y%m%d%H%M%S')" >> ${GITHUB_ENV}
     - name: package
       run: ./helper.sh package
     - name: create release
