@@ -8,7 +8,7 @@ bash scripting utils include file
 
 * download the `helper.sh` 
     script:
-    
+
     `wget https://raw.githubusercontent.com/jtviegas/bashutils/master/helper.sh`
 * make it executable: `chmod +x helper.sh`
 * update bashutils include file: `./helper.sh update_bashutils`
@@ -36,7 +36,7 @@ drwxr-xr-x  4 jotvi  staff   128 Jul 19 07:48 ..
 -rwxr-xr-x  1 jotvi  staff  2624 Jul 19 07:55 helper.sh
 drwxr-xr-x  7 jotvi  staff   224 Jul 19 07:56 .
 ```
-## Notes
+## notes
 
 the script tries to include variables and secrets into the running environment through the files `.variables`, `.local_variables` (_for local user specific variables, should not be included in versioning_) and `.secrets` (_should not be included in versioning_) in this order:
 ```
