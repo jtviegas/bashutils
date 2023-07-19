@@ -7,7 +7,9 @@ bash scripting utils include file
 ## usage
 
 * download the `helper.sh` 
-    script: `wget https://raw.githubusercontent.com/jtviegas/bashutils/master/helper.sh`
+    script:
+    
+    `wget https://raw.githubusercontent.com/jtviegas/bashutils/master/helper.sh`
 * make it executable: `chmod +x helper.sh`
 * update bashutils include file: `./helper.sh update_bashutils`
 
