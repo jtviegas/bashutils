@@ -167,4 +167,38 @@ download_function(){
   info "[download_function|out] ...done."
 }
 
+add_entry_to_variables()
+{
+  info "[add_entry_to_variables|in] ($1, $2)"
+  [ -z "$1" ] && err "no parameters provided" && return 1
+
+  variables_file="${this_folder}/${FILE_LOCAL_VARIABLES}"
+
+  if [ -f "$variables_file" ]; then
+    sed -i '' "/export $1/d" "$variables_file"
+
+    if [ ! -z "$2" ]; then
+      echo "export $1=$2" | tee -a "$variables_file" > /dev/null
+    fi
+  fi
+  info "[add_entry_to_variables|out]"
+}
+
+add_entry_to_secrets()
+{
+  info "[add_entry_to_secrets|in] ($1, ${2:0:7})"
+  [ -z "$1" ] && err "no parameters provided" && return 1
+
+  secrets_file="${this_folder}/${FILE_SECRETS}"
+
+  if [ -f "$secrets_file" ]; then
+    sed -i '' "/export $1/d" "$secrets_file"
+
+    if [ ! -z "$2" ]; then
+      echo "export $1=$2" | tee -a "$secrets_file" > /dev/null
+    fi
+  fi
+  info "[add_entry_to_secrets|out]"
+}
+
 

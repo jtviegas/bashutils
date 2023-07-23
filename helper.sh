@@ -82,9 +82,16 @@ update_bashutils(){
   echo "[update_bashutils] ...done."
 }
 
-# -------------------------------
-# --- MAIN SECTION ---
+# <=== COMMON SECTION END  <===
+# -------------------------------------
 
+# =======>    MAIN SECTION    =======>
+
+# ---------- LOCAL CONSTANTS ----------
+
+# ---------- LOCAL FUNCTIONS ----------
+
+# -------------------------------------
 usage() {
   cat <<EOM
   usage:
@@ -97,7 +104,6 @@ EOM
 }
 
 debug "1: $1 2: $2 3: $3 4: $4 5: $5 6: $6 7: $7 8: $8 9: $9"
-
 
 case "$1" in
   package)
