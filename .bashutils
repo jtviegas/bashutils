@@ -172,10 +172,14 @@ add_entry_to_variables()
   info "[add_entry_to_variables|in] ($1, $2)"
   [ -z "$1" ] && err "no parameters provided" && return 1
 
-  variables_file="${this_folder}/${FILE_LOCAL_VARIABLES}"
+  variables_file="${this_folder}/${FILE_VARIABLES}"
 
   if [ -f "$variables_file" ]; then
-    sed -i '' "/export $1/d" "$variables_file"
+    if [[ "$OSTYPE" == "darwin"* ]]; then
+      sed -i '' "/export $1=/d" "$variables_file"
+    else
+      sed -i "/$1=/c\\" "$variables_file"
+    fi
 
     if [ ! -z "$2" ]; then
       echo "export $1=$2" | tee -a "$variables_file" > /dev/null
@@ -192,7 +196,11 @@ add_entry_to_secrets()
   secrets_file="${this_folder}/${FILE_SECRETS}"
 
   if [ -f "$secrets_file" ]; then
-    sed -i '' "/export $1/d" "$secrets_file"
+    if [[ "$OSTYPE" == "darwin"* ]]; then
+      sed -i '' "/export $1=/d" "$secrets_file"
+    else
+      sed -i "/$1=/c\\" "$secrets_file"
+    fi
 
     if [ ! -z "$2" ]; then
       echo "export $1=$2" | tee -a "$secrets_file" > /dev/null
