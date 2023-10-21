@@ -167,25 +167,49 @@ download_function(){
   info "[download_function|out] ...done."
 }
 
+add_entry_to_file()
+{
+  info "[add_entry_to_file|in] ($1, $2, ${3:0:5})"
+  [ -z "$2" ] && err "no parameters provided" && return 1
+  local file="$1"
+  local file_path="${this_folder}/${file}"
+  local var_name="$2"
+  local var_value="$3"
+
+  if [ -f "$file_path" ]; then
+    if [[ "$OSTYPE" == "darwin"* ]]; then
+      sed -i '' "/export $var_name=/d" "$file_path"
+    else
+      sed -i "/$var_name=/c\\" "$file_path"
+    fi
+
+    if [ ! -z "$var_value" ]; then
+      echo "export $var_name=$var_value" | tee -a "$file_path" > /dev/null
+    fi
+  fi
+  info "[add_entry_to_file|out]"
+}
+
 add_entry_to_variables()
 {
   info "[add_entry_to_variables|in] ($1, $2)"
   [ -z "$1" ] && err "no parameters provided" && return 1
 
-  variables_file="${this_folder}/${FILE_VARIABLES}"
+  target_file="${FILE_VARIABLES}"
+  add_entry_to_file "$target_file" "$1" "$2" 
 
-  if [ -f "$variables_file" ]; then
-    if [[ "$OSTYPE" == "darwin"* ]]; then
-      sed -i '' "/export $1=/d" "$variables_file"
-    else
-      sed -i "/$1=/c\\" "$variables_file"
-    fi
-
-    if [ ! -z "$2" ]; then
-      echo "export $1=$2" | tee -a "$variables_file" > /dev/null
-    fi
-  fi
   info "[add_entry_to_variables|out]"
+}
+
+add_entry_to_local_variables()
+{
+  info "[add_entry_to_local_variables|in] ($1, $2)"
+  [ -z "$1" ] && err "no parameters provided" && return 1
+
+  target_file="${FILE_LOCAL_VARIABLES}"
+  add_entry_to_file "$target_file" "$1" "$2" 
+
+  info "[add_entry_to_local_variables|out]"
 }
 
 add_entry_to_secrets()
@@ -193,19 +217,9 @@ add_entry_to_secrets()
   info "[add_entry_to_secrets|in] ($1, ${2:0:7})"
   [ -z "$1" ] && err "no parameters provided" && return 1
 
-  secrets_file="${this_folder}/${FILE_SECRETS}"
+  target_file="${FILE_SECRETS}"
+  add_entry_to_file "$target_file" "$1" "$2" 
 
-  if [ -f "$secrets_file" ]; then
-    if [[ "$OSTYPE" == "darwin"* ]]; then
-      sed -i '' "/export $1=/d" "$secrets_file"
-    else
-      sed -i "/$1=/c\\" "$secrets_file"
-    fi
-
-    if [ ! -z "$2" ]; then
-      echo "export $1=$2" | tee -a "$secrets_file" > /dev/null
-    fi
-  fi
   info "[add_entry_to_secrets|out]"
 }
 
