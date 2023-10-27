@@ -223,4 +223,18 @@ add_entry_to_secrets()
   info "[add_entry_to_secrets|out]"
 }
 
+set_databricks_cli_access()
+{ 
+  info "[set_databricks_cli_access|in] ($1, $2)"
+  [ -z "$2" ] && err "no subscription Id provided" && return 1
+  [ -z "$1" ] && err "no workspace url provided" && return 1
+
+  az login
+  az account set --subscription "$2"
+  token=$(az account get-access-token --resource 2ff814a6-3304-4ab8-85cb-cd0e6f879c1d --query "accessToken" --output tsv)
+  add_entry_to_variables DATABRICKS_HOST "$1"
+  add_entry_to_secrets DATABRICKS_TOKEN "$token"
+  info "[set_databricks_cli_access|out]"
+}
+
 
