@@ -4,7 +4,7 @@ bash scripting utils include file
 
 ## Notes
 
-the script tries to include variables and secrets through the files `variables.inc` and `secrets.inc` in its folder:
+the script tries to include variables and secrets through the files `.variables` and `.secrets` in its folder:
 ```
 if [ ! -f "$this_folder/variables.inc" ]; then
   warn "we DON'T have a 'variables.inc' file"

@@ -11,18 +11,6 @@ if [ -z "$this_folder" ]; then
 fi
 parent_folder=$(dirname "$this_folder")
 
-# --- START include bashutils SECTION ---
-_pwd=$(pwd)
-cd "$this_folder"
-curl -s https://api.github.com/repos/tgedr/bashutils/releases/latest \
-| grep "browser_download_url.*utils\.tar\.bz2" \
-| cut -d '"' -f 4 | wget -qi -
-tar xjpvf utils.tar.bz2
-rm utils.tar.bz2
-. "$this_folder/bashutils.inc"
-cd "$_pwd"
-# --- END include bashutils SECTION ---
-
 update_bashutils(){
   echo "[update_bashutils] ..."
 
@@ -39,6 +27,16 @@ update_bashutils(){
   cd "$_pwd"
   echo "[update_bashutils] ...done."
 }
+
+# --- START include bashutils SECTION ---
+if [ ! -f "$this_folder/bashutils.inc" ]; then
+  update_bashutils
+fi
+
+. "$this_folder/bashutils.inc"
+# --- END include bashutils SECTION ---
+
+
 
 usage() {
   cat <<EOM
