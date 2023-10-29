@@ -229,6 +229,8 @@ set_databricks_cli_access()
   [ -z "$2" ] && err "no subscription Id provided" && return 1
   [ -z "$1" ] && err "no workspace url provided" && return 1
 
+  # dd62d6ec-d618-49ad-bd43-04a2ef12c0fb
+
   az login
   az account set --subscription "$2"
   token=$(az account get-access-token --resource 2ff814a6-3304-4ab8-85cb-cd0e6f879c1d --query "accessToken" --output tsv)
