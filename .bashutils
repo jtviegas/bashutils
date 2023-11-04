@@ -31,7 +31,7 @@ package(){
   _pwd=`pwd`
   cd "$this_folder"
 
-  tar cpvf "$TAR_NAME" "$INCLUDE_FILE"
+  tar cjpvf "$TAR_NAME" "$INCLUDE_FILE"
   if [ ! "$?" -eq "0" ] ; then err "[package] could not tar it" && cd "$_pwd" && return 1; fi
 
   cd "$_pwd"
