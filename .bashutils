@@ -259,7 +259,8 @@ python_build(){
 pypi_publish(){
   info "[pypi_publish|in] ($1, ${2:0:7})"
 
-  [ -z "$1" ]  || [ -z "$2" ] && usage
+  [ -z "$2" ] && usage
+  [ -z "$1" ] && usage
   user="$1"
   token="$2"
 
