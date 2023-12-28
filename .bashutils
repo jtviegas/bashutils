@@ -257,7 +257,7 @@ python_build(){
 
 
 pypi_publish(){
-  info "[pypi_publish] ..."
+  info "[pypi_publish|in] ($1, ${2:0:7})"
 
   [ -z "$1" ]  || [ -z "$2" ] && usage
   user="$1"
@@ -270,13 +270,13 @@ pypi_publish(){
   [ "$?" -ne "0" ] && err "[pypi_publish] ooppss" && exit 1
 
   cd "$_pwd"
-  echo "[pypi_publish] ...done."
+  echo "[pypi_publish|out]"
 }
 
 python_code_lint()
 {
     info "[python_code_lint|in]"
-    
+
     src_folders="src test"
     if [ ! -z "$1" ]; then
       src_folders="$1"
