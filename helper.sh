@@ -95,8 +95,8 @@ update_bashutils(){
 usage() {
   cat <<EOM
   usage:
-  $(basename $0) { package }
-
+  $(basename $0) { option }
+      options:
       - package: tars the bashutils include file
       - update_bashutils: updates the include '.bashutils' file
 EOM

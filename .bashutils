@@ -1,4 +1,6 @@
 
+
+
 # contains <list> <item>
 # echo $? # 0： match, 1: failed
 contains() {
@@ -237,6 +239,129 @@ set_databricks_cli_access()
   add_entry_to_variables DATABRICKS_HOST "$1"
   add_entry_to_secrets DATABRICKS_TOKEN "$token"
   info "[set_databricks_cli_access|out]"
+}
+
+python_build(){
+  info "[python_build] ..."
+
+  _pwd=`pwd`
+  cd "$this_folder"
+
+  rm -rf dist
+  python3 -m build
+  [ "$?" -ne "0" ] && err "[python_build] ooppss" && exit 1
+
+  cd "$_pwd"
+  echo "[python_build] ...done."
+}
+
+
+pypi_publish(){
+  info "[pypi_publish] ..."
+
+  [ -z "$1" ]  || [ -z "$2" ] && usage
+  user="$1"
+  token="$2"
+
+  _pwd=`pwd`
+  cd "$this_folder"
+
+  twine upload -u $user -p $token dist/*
+  [ "$?" -ne "0" ] && err "[pypi_publish] ooppss" && exit 1
+
+  cd "$_pwd"
+  echo "[pypi_publish] ...done."
+}
+
+python_code_lint()
+{
+    info "[python_code_lint|in]"
+    src_folders="src test"
+    info "[python_code_lint] ... isort..."
+    isort --profile black --src $src_folders
+    return_value=$?
+    info "[python_code_lint] ... isort...$return_value"
+    if [ "$return_value" -eq "0" ]; then
+      info "[python_code_lint] ... autoflake..."
+      autoflake --remove-all-unused-imports --in-place --recursive -r $src_folders
+      return_value=$?
+      info "[python_code_lint] ... autoflake...$return_value"
+    fi
+    if [ "$return_value" -eq "0" ]; then
+      info "[python_code_lint] ... black..."
+      black -v -t py38 $src_folders
+      return_value=$?
+      info "[python_code_lint] ... black...$return_value"
+    fi
+    [ "$return_value" -ne "0" ] && exit 1
+    info "[python_code_lint|out] => ${return_value}"
+}
+
+python_code_check()
+{
+    info "[python_code_check|in]"
+    src_folders="src test"
+    info "[python_code_check] ... isort..."
+    isort --profile black -v --src $src_folders
+    return_value=$?
+    info "[python_code_check] ... isort...$return_value"
+    if [ "$return_value" -eq "0" ]; then
+      info "[python_code_check] ... autoflake..."
+      autoflake --check -r $src_folders
+      return_value=$?
+      info "[python_code_check] ... autoflake...$return_value"
+    fi
+    if [ "$return_value" -eq "0" ]; then
+      info "[python_code_check] ... black..."
+      black --check $src_folders
+      return_value=$?
+      info "[python_code_check] ... black...$return_value"
+    fi
+    [ "$return_value" -ne "0" ] && exit 1
+    info "[python_code_check|out] => ${return_value}"
+}
+
+print_pytest_coverage()
+{
+  info "[print_pytest_coverage|in]"
+  coverage report -m
+  result="$?"
+  [ "$result" -ne "0" ] && exit 1
+  info "[print_pytest_coverage|out] => $result"
+}
+
+check_pytest_coverage()
+{
+  info "[check_pytest_coverage|in] ($1)"
+
+  [ -z "$1" ] && usage
+
+  local threshold=$1
+  score=$(coverage report | awk '$1 == "TOTAL" {print $NF+0}')
+   result="$?"
+  [ "$result" -ne "0" ] && exit 1
+  if (( $threshold > $score )); then
+    err "[check_pytest_coverage] $score doesn't meet $threshold"
+    exit 1
+  fi
+  info "[check_pytest_coverage|out] => $score"
+}
+
+python_test()
+{
+    info "[python_test|in] ($1)"
+    python -m pytest -x -vv --durations=0 --cov=src --junitxml=tests-results.xml --cov-report=xml --cov-report=html "$1"
+    return_value="$?"
+    [ "$return_value" -ne "0" ] && exit 1
+    info "[python_test|out] => ${return_value}"
+}
+
+python_reqs()
+{
+    info "[python_reqs|in]"
+    pip install -r requirements.txt
+    [ "$?" -ne "0" ] && exit 1
+    info "[python_reqs|out]"
 }
 
 
