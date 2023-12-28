@@ -276,7 +276,12 @@ pypi_publish(){
 python_code_lint()
 {
     info "[python_code_lint|in]"
+    
     src_folders="src test"
+    if [ ! -z "$1" ]; then
+      src_folders="$1"
+    fi
+
     info "[python_code_lint] ... isort..."
     isort --profile black --src $src_folders
     return_value=$?
@@ -300,7 +305,12 @@ python_code_lint()
 python_code_check()
 {
     info "[python_code_check|in]"
+
     src_folders="src test"
+    if [ ! -z "$1" ]; then
+      src_folders="$1"
+    fi
+    
     info "[python_code_check] ... isort..."
     isort --profile black -v --src $src_folders
     return_value=$?
