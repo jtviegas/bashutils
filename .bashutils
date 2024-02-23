@@ -276,20 +276,26 @@ pypi_publish(){
 }
 
 twine_publish(){
-  info "[twine_publish|in] ($1)"
+  info "[twine_publish|in] ($1, ${2:0:5}, $3)"
 
   [ -z "$1" ] || [ -z "$2" ] && usage
   user="$1"
   pswd="$2"
+
   local options="-u ${user} -p ${pswd}"
   if [ ! -z "$3" ]; then
     repo="$3" 
     options="${options} -r ${repo}"
   fi
+  info "[twine_publish] options used: ${options}"
+
+  _pwd=`pwd`
+  cd "$this_folder"
 
   twine upload --verbose "${options}"  dist/*.whl 
   return_value=$?
   info "[twine_publish|out] => ${return_value}"
+  cd "$_pwd"
   return ${return_value}
 }
 
