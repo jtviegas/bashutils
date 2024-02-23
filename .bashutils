@@ -1,5 +1,6 @@
 
 
+export DEFAULT_INFRA_DIR=infrastructure
 
 # contains <list> <item>
 # echo $? # 0： match, 1: failed
@@ -274,6 +275,24 @@ pypi_publish(){
   echo "[pypi_publish|out]"
 }
 
+twine_publish(){
+  info "[twine_publish|in] ($1)"
+
+  [ -z "$1" ] || [ -z "$2" ] && usage
+  user="$1"
+  pswd="$2"
+  local options="-u ${user} -p ${pswd}"
+  if [ ! -z "$3" ]; then
+    repo="$3" 
+    options="${options} -r ${repo}"
+  fi
+
+  twine upload --verbose "${options}"  dist/*.whl 
+  return_value=$?
+  info "[twine_publish|out] => ${return_value}"
+  return ${return_value}
+}
+
 python_code_lint()
 {
     info "[python_code_lint|in]"
@@ -301,6 +320,7 @@ python_code_lint()
     fi
     [ "$return_value" -ne "0" ] && exit 1
     info "[python_code_lint|out] => ${return_value}"
+    return ${return_value}
 }
 
 python_code_check()
@@ -330,6 +350,7 @@ python_code_check()
     fi
     [ "$return_value" -ne "0" ] && exit 1
     info "[python_code_check|out] => ${return_value}"
+    return ${return_value}
 }
 
 print_pytest_coverage()
@@ -339,6 +360,7 @@ print_pytest_coverage()
   result="$?"
   [ "$result" -ne "0" ] && exit 1
   info "[print_pytest_coverage|out] => $result"
+  return ${result}
 }
 
 check_pytest_coverage()
@@ -365,6 +387,7 @@ python_test()
     return_value="$?"
     [ "$return_value" -ne "0" ] && exit 1
     info "[python_test|out] => ${return_value}"
+    return ${return_value}
 }
 
 python_reqs()
@@ -373,6 +396,68 @@ python_reqs()
     pip install -r requirements.txt
     [ "$?" -ne "0" ] && exit 1
     info "[python_reqs|out]"
+}
+
+commands() {
+  cat <<EOM
+
+  handy commands:
+
+  jupyter-notebook --log-level=40 --no-browser                            starts jupyter server
+  cdk init app --language typescript                                      create new cdk app on typescript
+  npm run build                                                           compile typescript to js
+  npm run watch                                                           watch for changes and compile
+  npm run test                                                            perform the jest unit tests
+  aws-cdk
+    cdk init app --language typescript                                    create new cdk app on typescript
+    cdk deploy                                                            deploy this stack to your default AWS account/region
+    cdk diff                                                              compare deployed stack with current state
+    cdk synth                                                             emits the synthesized CloudFormation template
+  aws
+    aws cloudformation delete-stack --stack-name CDKToolkit               delete stack to later recreate with bootstrap (see https://stackoverflow.com/questions/71280758/aws-cdk-bootstrap-itself-broken/71283964#71283964)
+    aws configure sso --profile nn --no-browser                           configure sso
+    export AWS_PROFILE=nn                                                 set current environment profile
+    aws sts get-caller-identity                                           check current session
+    aws sts get-caller-identity --profile <PROFILE>                       display session profile info
+    aws lambda invoke --function-name FUNCTION_NAME out --log-type Tail 
+
+EOM
+}
+
+cdk_infra()
+{
+  # usage:
+  #    $(basename $0) { operation } [infrastructure_folder]
+  #      options:
+  #      - operation: { on | off }
+  #      - infrastructure_folder: default=infrastructure 
+  info "[cdk_infra|in] ($1) ($2)"
+
+  [ -z $1 ] && usage
+  [ "$1" != "on" ] && [ "$1" != "off" ] && usage
+  local operation="$1"
+  local tf_dir="${DEFAULT_INFRA_DIR}"
+  if [ ! -z $2 ]; then
+    local tf_dir="$2"
+  else
+    info "[cdk_infra] assuming default infra folder: ${DEFAULT_INFRA_DIR}"
+  fi
+
+  _pwd=`pwd`
+  cd "$tf_dir"
+
+  if [ "$operation" == "on" ]; then
+    cdk synth
+    [ "$?" -ne "0" ] && err "[infra] couldn't synth" && cd "$_pwd" && exit 1
+    cdk deploy --require-approval=never
+    [ "$?" -ne "0" ] && err "[infra] couldn't deploy" && cd "$_pwd" && exit 1
+  elif [ "$operation" == "off" ]; then
+    cdk destroy --force
+    [ "$?" -ne "0" ] && err "[infra] couldn't destroy" && cd "$_pwd" && exit 1
+  fi
+
+  cd "$_pwd"
+  info "[cdk_infra|out]"
 }
 
 
