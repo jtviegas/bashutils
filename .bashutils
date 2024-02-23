@@ -285,7 +285,7 @@ twine_publish(){
   local options="-u ${user} -p ${pswd}"
   if [ ! -z "$3" ]; then
     repo_url="$3" 
-    options="${options} --repository-url ${repo}"
+    options="${options} --repository-url ${repo_url}"
   fi
   info "[twine_publish] options used: ${options}"
 
