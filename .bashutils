@@ -282,17 +282,16 @@ twine_publish(){
   user="$1"
   pswd="$2"
 
-  local options="-u ${user} -p ${pswd}"
-  if [ ! -z "$3" ]; then
-    repo_url="$3" 
-    options="${options} --repository-url ${repo_url}"
-  fi
-  info "[twine_publish] options used: ${options}"
-
   _pwd=`pwd`
   cd "$this_folder"
 
-  twine upload --verbose "${options}"  dist/*.whl 
+  if [ ! -z "$3" ]; then
+    repo_url="$3" 
+    twine upload --verbose -u "${user}" -p "${pswd}" --repository-url "${repo_url}" dist/*.whl 
+  else
+    twine upload --verbose -u "${user}" -p "${pswd}" dist/*.whl 
+  fi
+
   return_value=$?
   info "[twine_publish|out] => ${return_value}"
   cd "$_pwd"
