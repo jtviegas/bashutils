@@ -292,10 +292,10 @@ twine_publish(){
     twine upload --verbose -u "${user}" -p "${pswd}" dist/*.whl 
   fi
 
-  return_value=$?
-  info "[twine_publish|out] => ${return_value}"
+  result=$?
   cd "$_pwd"
-  return ${return_value}
+  [ "$result" -ne "0" ] && err "[twine_publish|out]  => ${result}" && exit 1
+  info "[twine_publish|out] => ${result}"
 }
 
 python_code_lint()
@@ -465,4 +465,20 @@ cdk_infra()
   info "[cdk_infra|out]"
 }
 
-
+cdk_setup()
+{
+    info "[cdk_setup|in] ($1)"
+    local tf_dir="${DEFAULT_INFRA_DIR}"
+    if [ ! -z $1 ]; then
+      local tf_dir="$1"
+    else
+      info "[cdk_setup] assuming default infra folder: ${DEFAULT_INFRA_DIR}"
+    fi
+    _pwd=`pwd`
+    cd "$tf_dir"
+    npm install
+    result="$?"
+    cd "$_pwd"
+    [ "$result" -ne "0" ] && err "[cdk_setup|out]  => ${result}" && exit 1
+    info "[cdk_setup|out] => ${result}"
+}
