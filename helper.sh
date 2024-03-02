@@ -97,7 +97,7 @@ usage() {
   usage:
   $(basename $0) { option }
       options:
-      - package: tars the bashutils include file
+      - commands: lists handy commands we use all the time
       - update_bashutils: updates the include '.bashutils' file
 EOM
   exit 1
@@ -106,8 +106,8 @@ EOM
 debug "1: $1 2: $2 3: $3 4: $4 5: $5 6: $6 7: $7 8: $8 9: $9"
 
 case "$1" in
-  package)
-    package
+  commands)
+    commands
     ;;
   update_bashutils)
     update_bashutils
