@@ -424,7 +424,8 @@ commands() {
     export AWS_PROFILE=nn                                                 set current environment profile
     aws sts get-caller-identity                                           check current session
     aws sts get-caller-identity --profile <PROFILE>                       display session profile info
-    aws lambda invoke --function-name FUNCTION_NAME out --log-type Tail 
+    aws lambda invoke --function-name FUNCTION_NAME out --log-type Tail
+  docker run hello-world                                                  check docker
 
 EOM
 }
@@ -454,10 +455,10 @@ cdk_infra()
   if [ "$operation" == "on" ]; then
     cdk synth
     [ "$?" -ne "0" ] && err "[infra] couldn't synth" && cd "$_pwd" && exit 1
-    cdk deploy --require-approval=never
+    cdk deploy --all --require-approval=never
     [ "$?" -ne "0" ] && err "[infra] couldn't deploy" && cd "$_pwd" && exit 1
   elif [ "$operation" == "off" ]; then
-    cdk destroy --force
+    cdk destroy --all --force
     [ "$?" -ne "0" ] && err "[infra] couldn't destroy" && cd "$_pwd" && exit 1
   fi
 
