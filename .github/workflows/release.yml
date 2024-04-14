@@ -12,7 +12,7 @@ jobs:
     - name: set timestamp
       run: echo "RELEASE_TS=$(date +'%y%m%d%H%M%S')" >> ${GITHUB_ENV}
     - name: package
-      run: ./helper.sh package
+      run: ./helper.sh bashutils package
     - name: create release
       uses: svenstaro/upload-release-action@v2
       with:
