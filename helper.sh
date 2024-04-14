@@ -98,7 +98,9 @@ usage() {
   $(basename $0) { option }
       options:
       - commands: lists handy commands we use all the time
-      - update_bashutils: updates the include '.bashutils' file
+      - bashutils {package, update}
+        - updates the include '.bashutils' file
+        - packages bashutils for new releaae
 EOM
   exit 1
 }
@@ -109,8 +111,15 @@ case "$1" in
   commands)
     commands
     ;;
-  update_bashutils)
-    update_bashutils
+  bashutils)
+    case "$2" in
+      package)
+        package
+        ;;
+      update)
+        update_bashutils
+        ;;
+    esac
     ;;
   *)
     usage
