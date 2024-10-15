@@ -388,7 +388,7 @@ check_pytest_coverage()
 python_test()
 {
     info "[python_test|in] ($1)"
-    python -m pytest -x -vv --durations=0 --cov=src --junitxml=tests-results.xml --cov-report=xml --cov-report=html "$1"
+    python -m pytest -x -s -vv --durations=0 --cov=src --junitxml=tests-results.xml --cov-report=xml --cov-report=html "$1"
     return_value="$?"
     [ "$return_value" -ne "0" ] && exit 1
     info "[python_test|out] => ${return_value}"
@@ -401,33 +401,6 @@ python_reqs()
     pip install -r requirements.txt
     [ "$?" -ne "0" ] && exit 1
     info "[python_reqs|out]"
-}
-
-commands() {
-  cat <<EOM
-
-  handy commands:
-
-  jupyter-notebook --log-level=40 --no-browser                            starts jupyter server
-  cdk init app --language typescript                                      create new cdk app on typescript
-  npm run build                                                           compile typescript to js
-  npm run watch                                                           watch for changes and compile
-  npm run test                                                            perform the jest unit tests
-  aws-cdk
-    cdk init app --language typescript                                    create new cdk app on typescript
-    cdk deploy                                                            deploy this stack to your default AWS account/region
-    cdk diff                                                              compare deployed stack with current state
-    cdk synth                                                             emits the synthesized CloudFormation template
-  aws
-    aws cloudformation delete-stack --stack-name CDKToolkit               delete stack to later recreate with bootstrap (see https://stackoverflow.com/questions/71280758/aws-cdk-bootstrap-itself-broken/71283964#71283964)
-    aws configure sso --profile nn --no-browser                           configure sso
-    export AWS_PROFILE=nn                                                 set current environment profile
-    aws sts get-caller-identity                                           check current session
-    aws sts get-caller-identity --profile <PROFILE>                       display session profile info
-    aws lambda invoke --function-name FUNCTION_NAME out --log-type Tail
-  docker run hello-world                                                  check docker
-
-EOM
 }
 
 cdk_infra()
@@ -455,7 +428,7 @@ cdk_infra()
   if [ "$operation" == "on" ]; then
     cdk synth
     [ "$?" -ne "0" ] && err "[infra] couldn't synth" && cd "$_pwd" && exit 1
-    cdk deploy --all --require-approval=never
+    cdk deploy --all --require-approval=never -v --debug
     [ "$?" -ne "0" ] && err "[infra] couldn't deploy" && cd "$_pwd" && exit 1
   elif [ "$operation" == "off" ]; then
     cdk destroy --all --force
@@ -484,19 +457,21 @@ cdk_setup()
     info "[cdk_setup|out] => ${result}"
 }
 
-commands(){
-    cat <<EOM
+commands() {
+  cat <<EOM
+
   handy commands:
 
   jupyter-notebook --log-level=40 --no-browser                            starts jupyter server
+  cdk init app --language typescript                                      create new cdk app on typescript
+  npm run build                                                           compile typescript to js
+  npm run watch                                                           watch for changes and compile
+  npm run test                                                            perform the jest unit tests
   aws-cdk
+    cdk init app --language typescript                                    create new cdk app on typescript
     cdk deploy                                                            deploy this stack to your default AWS account/region
     cdk diff                                                              compare deployed stack with current state
     cdk synth                                                             emits the synthesized CloudFormation template
-    cdk init app --language typescript                                    create new cdk app on typescript
-    npm run build                                                         compile typescript to js
-    npm run watch                                                         watch for changes and compile
-    npm run test                                                          perform the jest unit tests
   aws
     aws cloudformation delete-stack --stack-name <STACKNAME>              delete stack to later recreate with bootstrap (see https://stackoverflow.com/questions/71280758/aws-cdk-bootstrap-itself-broken/71283964#71283964)
     aws configure sso --profile nn --no-browser                           configure sso
@@ -504,5 +479,6 @@ commands(){
     aws sts get-caller-identity                                           check current session
     aws sts get-caller-identity --profile <PROFILE>                       display session profile info
     aws lambda invoke --function-name FUNCTION_NAME out --log-type Tail 
+
 EOM
 }
