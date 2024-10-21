@@ -481,6 +481,7 @@ commands() {
 
   handy commands:
 
+  python -m venv .venv                                             create virtual environment
   jupyter-notebook --log-level=40 --no-browser                            starts jupyter server
   cdk init app --language typescript                                      create new cdk app on typescript
   npm run build                                                           compile typescript to js
