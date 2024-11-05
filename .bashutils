@@ -413,7 +413,7 @@ cdk_infra()
   info "[cdk_infra|in] ($1) ($2)"
 
   [ -z $1 ] && usage
-  [ "$1" != "on" ] && [ "$1" != "off" ] && usage
+  [ "$1" != "on" ] && [ "$1" != "off" ]&& [ "$1" != "bootstrap" ] && usage
   local operation="$1"
   local tf_dir="${DEFAULT_INFRA_DIR}"
   if [ ! -z $2 ]; then
@@ -422,17 +422,26 @@ cdk_infra()
     info "[cdk_infra] assuming default infra folder: ${DEFAULT_INFRA_DIR}"
   fi
 
+  if [ ! -z $3 ]; then
+    local stacks="$3"
+  else
+    local stacks="--all"
+  fi
+
   _pwd=`pwd`
   cd "$tf_dir"
 
   if [ "$operation" == "on" ]; then
-    cdk synth
+    cdk synth "$stacks"
     [ "$?" -ne "0" ] && err "[infra] couldn't synth" && cd "$_pwd" && exit 1
-    cdk deploy --all --require-approval=never -v --debug
+    cdk deploy "$stacks" --require-approval=never -v --debug
     [ "$?" -ne "0" ] && err "[infra] couldn't deploy" && cd "$_pwd" && exit 1
   elif [ "$operation" == "off" ]; then
-    cdk destroy --all --force
+    cdk destroy "$stacks" --force
     [ "$?" -ne "0" ] && err "[infra] couldn't destroy" && cd "$_pwd" && exit 1
+  elif [ "$operation" == "bootstrap" ]; then
+    cdk bootstrap --force --termination-protection false
+    [ "$?" -ne "0" ] && err "[infra] couldn't bootstrap" && cd "$_pwd" && exit 1
   fi
 
   cd "$_pwd"
