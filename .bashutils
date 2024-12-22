@@ -485,6 +485,26 @@ npm_publish(){
   info "[npm_publish] ...done."
 }
 
+cdk_global_reqs(){
+  info "[cdk_global_reqs|in]"
+
+  [ -z $1 ] && err "[cdk_global_reqs] missing argument TYPESCRIPT_VERSION" && return 1
+  local TYPESCRIPT_VERSION="$1"
+  [ -z $2 ] && err "[cdk_global_reqs] missing argument CDK_VERSION" && return 1
+  local CDK_VERSION="$2"
+  [ -z $3 ] && err "[cdk_global_reqs] missing argument TS_NODE_VERSION" && return 1
+  local TS_NODE_VERSION="$3"
+  [ -z $4 ] && err "[cdk_global_reqs] missing argument INTEG_RUNNER_VERSION" && return 1
+  local INTEG_RUNNER_VERSION="$4"
+  [ -z $5 ] && err "[cdk_global_reqs] missing argument INTEG_TESTS_ALPHA_VERSION" && return 1
+  local INTEG_TESTS_ALPHA_VERSION="$5"
+
+  npm install -g "typescript@${TYPESCRIPT_VERSION}" "aws-cdk@${CDK_VERSION}" "ts-node@${TS_NODE_VERSION}" "@aws-cdk/integ-runner@${INTEG_RUNNER_VERSION}" "@aws-cdk/integ-tests-alpha@${INTEG_TESTS_ALPHA_VERSION}"
+  result="$?"
+  [ "$result" -ne "0" ] && err "[cdk_global_reqs|out]  => ${result}" && exit 1
+  info "[cdk_global_reqs|out] => ${result}"
+}
+
 commands() {
   cat <<EOM
 
