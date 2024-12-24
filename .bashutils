@@ -522,6 +522,35 @@ cdk_scaffolding(){
   info "[cdk_scaffolding|out] => ${result}"
 }
 
+set_aws_profile(){
+  info "[set_aws_profile|in] ($1, $2, ${3:0:5}, $4, $5)"
+
+  [ -z $1 ] && err "[set_aws_profile] missing argument PROFILE" && return 1
+  local PROFILE="$1"
+  [ -z $2 ] && err "[set_aws_profile] missing argument KEY" && return 1
+  local KEY="$2"
+  [ -z $3 ] && err "[set_aws_profile] missing argument SECRET" && return 1
+  local SECRET="$3"
+  [ -z $4 ] && err "[set_aws_profile] missing argument REGION" && return 1
+  local REGION="$4"
+
+  if [ ! -z $5 ]; then
+    local OUTPUT="$5"
+  else
+    local OUTPUT="json"
+  fi
+
+  aws configure --profile $PROFILE set region $REGION \
+    && aws configure --profile $PROFILE set output $OUTPUT \
+    && aws configure --profile $PROFILE set aws_secret_access_key $SECRET \
+    && aws configure --profile $PROFILE set aws_access_key_id $KEY
+
+  result="$?"
+  cd "$_pwd"
+  [ "$result" -ne "0" ] && err "[set_aws_profile|out]  => ${result}" && exit 1
+  info "[set_aws_profile|out] => ${result}"
+}
+
 commands() {
   cat <<EOM
 
