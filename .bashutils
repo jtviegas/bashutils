@@ -428,25 +428,19 @@ cdk_infra()
     local stacks="--all"
   fi
 
-  if [ ! -z $AWS_PROFILE ]; then
-    local profile_expression="--profile $AWS_PROFILE"
-  else
-    local profile_expression=""
-  fi
-
   _pwd=`pwd`
   cd "$tf_dir"
 
   if [ "$operation" == "on" ]; then
-    cdk synth "$stacks" "$profile_expression"
+    cdk synth "$stacks"
     [ "$?" -ne "0" ] && err "[infra] couldn't synth" && cd "$_pwd" && exit 1
-    cdk deploy "$stacks" --require-approval=never -v --debug "$profile_expression"
+    cdk deploy "$stacks" --require-approval=never -v --debug
     [ "$?" -ne "0" ] && err "[infra] couldn't deploy" && cd "$_pwd" && exit 1
   elif [ "$operation" == "off" ]; then
-    cdk destroy "$stacks" --force "$profile_expression"
+    cdk destroy "$stacks" --force
     [ "$?" -ne "0" ] && err "[infra] couldn't destroy" && cd "$_pwd" && exit 1
   elif [ "$operation" == "bootstrap" ]; then
-    cdk bootstrap --force --termination-protection false "$profile_expression"
+    cdk bootstrap --force --termination-protection false
     [ "$?" -ne "0" ] && err "[infra] couldn't bootstrap" && cd "$_pwd" && exit 1
   fi
 
