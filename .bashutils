@@ -492,7 +492,7 @@ npm_publish(){
 }
 
 cdk_global_reqs(){
-  info "[cdk_global_reqs|in] ($1, $2, $3, $4, $5)"
+  info "[cdk_global_reqs|in] ($1, $2, $3, $4, $5, $6)"
 
   [ -z $1 ] && err "[cdk_global_reqs] missing argument TYPESCRIPT_VERSION" && return 1
   local TYPESCRIPT_VERSION="$1"
@@ -504,8 +504,12 @@ cdk_global_reqs(){
   local INTEG_RUNNER_VERSION="$4"
   [ -z $5 ] && err "[cdk_global_reqs] missing argument INTEG_TESTS_ALPHA_VERSION" && return 1
   local INTEG_TESTS_ALPHA_VERSION="$5"
+  [ -z $6 ] && err "[cdk_global_reqs] missing argument JEST_VERSION" && return 1
+  local JEST_VERSION="$6"
 
-  npm install -g "typescript@${TYPESCRIPT_VERSION}" "aws-cdk@${CDK_VERSION}" "ts-node@${TS_NODE_VERSION}" "@aws-cdk/integ-runner@${INTEG_RUNNER_VERSION}" "@aws-cdk/integ-tests-alpha@${INTEG_TESTS_ALPHA_VERSION}"
+  npm install -g "typescript@${TYPESCRIPT_VERSION}" "aws-cdk@${CDK_VERSION}" "ts-node@${TS_NODE_VERSION}" \
+   "@aws-cdk/integ-runner@${INTEG_RUNNER_VERSION}" "@aws-cdk/integ-tests-alpha@${INTEG_TESTS_ALPHA_VERSION}" \
+   "jest@${JEST_VERSION}"
   result="$?"
   [ "$result" -ne "0" ] && err "[cdk_global_reqs|out]  => ${result}" && exit 1
   info "[cdk_global_reqs|out] => ${result}"
@@ -514,7 +518,7 @@ cdk_global_reqs(){
 cdk_scaffolding(){
   info "[cdk_scaffolding|in] ($1)"
 
-  [ -z $1 ] && err "[cdk_scaffolding] missing argument INFRA_DIR" && return 1
+  [ -z $1 ] && err "[cdk_scaffolding] missing argument INFRA_DIR" && exit 1
   local INFRA_DIR="$1"
 
   _pwd=`pwd`
@@ -527,6 +531,33 @@ cdk_scaffolding(){
   [ "$result" -ne "0" ] && err "[cdk_scaffolding|out]  => ${result}" && exit 1
   info "[cdk_scaffolding|out] => ${result}"
 }
+
+infra_cdk_bootstrap(){
+  info "[infra_cdk_bootstrap|in] ($1, $2, $3, $4, $5, $6)"
+
+  [ -z $1 ] && err "[infra_cdk_bootstrap] missing argument TYPESCRIPT_VERSION" && return 1
+  local TYPESCRIPT_VERSION="$1"
+  [ -z $2 ] && err "[infra_cdk_bootstrap] missing argument CDK_VERSION" && return 1
+  local CDK_VERSION="$2"
+  [ -z $3 ] && err "[infra_cdk_bootstrap] missing argument TS_NODE_VERSION" && return 1
+  local TS_NODE_VERSION="$3"
+  [ -z $4 ] && err "[infra_cdk_bootstrap] missing argument INTEG_RUNNER_VERSION" && return 1
+  local INTEG_RUNNER_VERSION="$4"
+  [ -z $5 ] && err "[infra_cdk_bootstrap] missing argument INTEG_TESTS_ALPHA_VERSION" && return 1
+  local INTEG_TESTS_ALPHA_VERSION="$5"
+  [ -z $6 ] && err "[cdk_global_reqs] missing argument JEST_VERSION" && return 1
+  local JEST_VERSION="$6"
+  [ -z $7 ] && err "[infra_cdk_bootstrap] missing argument INFRA_DIR" && return 1
+  local INFRA_DIR="$7"
+
+  cdk_global_reqs "$TYPESCRIPT_VERSION" "$CDK_VERSION" "$TS_NODE_VERSION" "$INTEG_RUNNER_VERSION" \
+    "$INTEG_TESTS_ALPHA_VERSION" "$JEST_VERSION"  && cdk_scaffolding "$INFRA_DIR"
+
+  result="$?"
+  [ "$result" -ne "0" ] && err "[infra_cdk_bootstrap|out]  => ${result}" && exit 1
+  info "[infra_cdk_bootstrap|out] => ${result}"
+}
+
 
 set_aws_profile(){
   info "[set_aws_profile|in] ($1, $2, ${3:0:5}, $4, $5)"
@@ -555,6 +586,55 @@ set_aws_profile(){
   cd "$_pwd"
   [ "$result" -ne "0" ] && err "[set_aws_profile|out]  => ${result}" && exit 1
   info "[set_aws_profile|out] => ${result}"
+}
+
+npm_deps(){
+  info "[npm_deps|in] ($1)"
+
+  [ -z $1 ] && err "[npm_deps] missing argument INFRA_DIR" && exit 1
+  local INFRA_DIR="$1"
+
+  _pwd=`pwd`
+  cd "$INFRA_DIR"
+
+  npm install
+
+  result="$?"
+  cd "$_pwd"
+  [ "$result" -ne "0" ] && err "[npm_deps|out]  => ${result}" && exit 1
+  info "[npm_deps|out] => ${result}"
+}
+
+get_cloudfront_cidr(){
+  info "[get_cloudfront_cidr|in] ($1)"
+
+  [ -z $1 ] && err "[get_cloudfront_cidr] missing argument OUTPUT_FILE" && exit 1
+  local OUTPUT_FILE="$1"
+
+  local prefix_list_id=$(aws ec2 describe-managed-prefix-lists | jq -r ".\"PrefixLists\" | .[] | select(.PrefixListName == \"com.amazonaws.global.cloudfront.origin-facing\") | .PrefixListId")
+  local outputs=$(aws ec2 get-managed-prefix-list-entries --prefix-list-id "$prefix_list_id" --output json)
+  echo $outputs | jq -r ".\"Entries\"" > "$OUTPUT_FILE"
+
+  result="$?"
+  [ "$result" -ne "0" ] && err "[get_cloudfront_cidr|out]  => ${result}" && exit 1
+  info "[get_cloudfront_cidr|out] => ${result}"
+}
+
+test_js_lambda(){
+  info "[test_js_lambda|in] ({$1})"
+
+  [ -z $1 ] && err "[get_cloudfront_cidr] missing argument FUNCTION_DIR" && exit 1
+  local FUNCTION_DIR="$1"
+  _pwd=`pwd`
+  cd "$FUNCTION_DIR"
+
+  npm install
+  jest
+
+  result="$?"
+  cd "$_pwd"
+  [ "$result" -ne "0" ] && err "[test_js_lambda|out]  => ${result}" && exit 1
+  info "[test_js_lambda|out] => ${result}"
 }
 
 commands() {
