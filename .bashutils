@@ -631,6 +631,23 @@ test_js_lambda(){
   info "[test_js_lambda|out] => ${result}"
 }
 
+find_kms_alias(){
+  echo "[find_kms_alias|in] ($1)"
+
+  [ -z $1 ] && err "[find_kms_alias] missing argument ALIAS" && exit 1
+  local ALIAS="$1"
+  result=1
+
+  local alias_resource=$(aws kms list-aliases | jq -r ".\"Aliases\" | .[] | select(.AliasName == \"$ALIAS\") | .AliasName")
+  echo "[find_kms_alias] alias_resource: ${alias_resource}"
+  if [ "$alias_resource" != "" ]; then
+    result=0
+  fi
+
+  echo "[find_kms_alias|out] => ${result}"
+  return ${result}
+}
+
 commands() {
   cat <<EOM
 
