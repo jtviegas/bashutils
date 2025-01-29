@@ -659,6 +659,7 @@ commands() {
   npm run build                                                           compile typescript to js
   npm run watch                                                           watch for changes and compile
   npm run test                                                            perform the jest unit tests
+  git config user.email "$JTV_GITHUB_EMAIL"                               set local git config email
   aws-cdk
     cdk init app --language typescript                                    create new cdk app on typescript
     cdk deploy                                                            deploy this stack to your default AWS account/region
