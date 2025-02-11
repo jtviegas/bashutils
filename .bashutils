@@ -648,6 +648,51 @@ find_kms_alias(){
   return ${result}
 }
 
+databricks_bundle_deploy(){
+  info "[databricks_bundle_deploy|in]"
+
+  [ -z $1 ] && err "[databricks_bundle_deploy] missing argument BUNDLE_FOLDER" && exit 1
+  local BUNDLE_FOLDER="$1"
+  local BUNDLE_TARGET="local"
+  [ ! -z $2 ] && BUNDLE_TARGET="$2"
+
+  [ "main" != "$BUNDLE_TARGET" ] && [ "local" != "$BUNDLE_TARGET" ] && err "[databricks_bundle_deploy] wrong argument BUNDLE_TARGET: $BUNDLE_TARGET" && exit 1
+  info "[databricks_bundle_deploy] BUNDLE_FOLDER: $BUNDLE_FOLDER   BUNDLE_TARGET: $BUNDLE_TARGET"
+
+  _pwd=`pwd`
+  cd "$BUNDLE_FOLDER"
+
+  databricks bundle validate --target "$BUNDLE_TARGET" --debug && \
+    databricks bundle deploy --target "$BUNDLE_TARGET" --auto-approve --fail-on-active-runs --force-lock --debug
+
+  result="$?"
+  cd "$_pwd"
+  [ "$result" -ne "0" ] && err "[databricks_bundle_deploy|out]  => ${result}" && exit 1
+  info "[databricks_bundle_deploy|out] => ${result}"
+}
+
+databricks_bundle_destroy(){
+  info "[databricks_bundle_destroy|in]"
+
+  [ -z $1 ] && err "[databricks_bundle_destroy] missing argument BUNDLE_FOLDER" && exit 1
+  local BUNDLE_FOLDER="$1"
+  local BUNDLE_TARGET="local"
+  [ ! -z $2 ] && BUNDLE_TARGET="$2"
+
+  [ "main" != "$BUNDLE_TARGET" ] && [ "local" != "$BUNDLE_TARGET" ] && err "[databricks_bundle_destroy] wrong argument BUNDLE_TARGET: $BUNDLE_TARGET" && exit 1
+  info "[databricks_bundle_destroy] BUNDLE_FOLDER: $BUNDLE_FOLDER   BUNDLE_TARGET: $BUNDLE_TARGET"
+
+  _pwd=`pwd`
+  cd "$BUNDLE_FOLDER"
+
+  databricks bundle destroy --target "$BUNDLE_TARGET" --auto-approve --force-lock --debug
+
+  result="$?"
+  cd "$_pwd"
+  [ "$result" -ne "0" ] && err "[databricks_bundle_destroy|out]  => ${result}" && exit 1
+  info "[databricks_bundle_destroy|out] => ${result}"
+}
+
 commands() {
   cat <<EOM
 
