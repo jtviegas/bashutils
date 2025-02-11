@@ -249,7 +249,7 @@ python_build(){
   cd "$this_folder"
 
   rm -rf dist
-  python3 -m build
+  python3 -m build -n
   [ "$?" -ne "0" ] && err "[python_build] ooppss" && exit 1
 
   cd "$_pwd"
