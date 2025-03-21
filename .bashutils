@@ -308,7 +308,7 @@ python_code_lint()
     fi
 
     info "[python_code_lint] ... isort..."
-    isort --profile black --src $src_folders
+    isort --profile black -v $src_folders
     return_value=$?
     info "[python_code_lint] ... isort...$return_value"
     if [ "$return_value" -eq "0" ]; then
@@ -338,7 +338,7 @@ python_code_check()
     fi
     
     info "[python_code_check] ... isort..."
-    isort --profile black -v --src $src_folders
+    isort --profile black -v $src_folders
     return_value=$?
     info "[python_code_check] ... isort...$return_value"
     if [ "$return_value" -eq "0" ]; then
