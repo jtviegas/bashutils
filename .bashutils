@@ -1,4 +1,6 @@
-
+##########################################
+#######    ------- bash -------    #######
+##########################################
 
 export DEFAULT_INFRA_DIR=infrastructure
 
@@ -41,94 +43,6 @@ package(){
   info "[package] ...done."
 }
 
-terraform_autodeploy(){
-  info "[terraform_autodeploy] ..."
-
-  [ -z $1 ] && err "[terraform_autodeploy] missing function argument FOLDER" && return 1
-  local folder="$1"
-
-  verify_prereqs terraform
-  if [ ! "$?" -eq "0" ] ; then return 1; fi
-
-  _pwd=$(pwd)
-  cd "$folder"
-
-  terraform init
-  terraform plan
-  terraform apply -auto-approve -lock=true -lock-timeout=10m
-  if [ ! "$?" -eq "0" ]; then err "[terraform_autodeploy] could not apply" && cd "$_pwd" && return 1; fi
-  cd "$_pwd"
-  info "[terraform_autodeploy] ...done."
-}
-
-terraform_autodestroy(){
-  info "[terraform_autodestroy] ..."
-
-  [ -z $1 ] && err "[terraform_autodestroy] missing function argument FOLDER" && return 1
-  local folder="$1"
-
-  verify_prereqs terraform
-  if [ ! "$?" -eq "0" ] ; then return 1; fi
-
-  _pwd=$(pwd)
-  cd "$folder"
-
-  terraform destroy -auto-approve -lock=true -lock-timeout=10m
-  if [ ! "$?" -eq "0" ]; then err "[terraform_autodestroy] could not apply" && cd "$_pwd" && return 1; fi
-  cd "$_pwd"
-  info "[terraform_autodestroy] ...done."
-}
-
-zip_js_lambda_function(){
-  info "[zip_js_lambda_function] ...( $@ )"
-  local usage_msg=$'zip_js_lambda_function: zips a js lambda function:\nusage:\n    zip_js_lambda_function SRC_DIR ZIP_FILE { FILES FOLDERS ... }'
-
-  verify_prereqs npm
-  if [ ! "$?" -eq "0" ] ; then return 1; fi
-
-  if [ -z "$3" ] ; then echo "$usage_msg" && return 1; fi
-
-  local src_dir="$1"
-  local zip_file="$2"
-  local files="${@:3}"
-  local AWS_SDK_MODULE_PATH=$src_dir/node_modules/aws-sdk
-
-  _pwd=`pwd`
-  cd "$src_dir"
-
-  if [ -f "package.json" ]; then
-    npm install &>/dev/null
-    if [ ! "$?" -eq "0" ] ; then err "[zip_js_lambda_function] could not install dependencies" && cd "$_pwd" && return 1; fi
-    if [ -d "${AWS_SDK_MODULE_PATH}" ]; then rm -r "$AWS_SDK_MODULE_PATH"; fi
-  fi
-
-  rm -f "$zip_file"
-  zip -9 -q -r "$zip_file" "$files" &>/dev/null
-  if [ ! "$?" -eq "0" ] ; then err "[zip_js_lambda_function] could not zip it" && cd "$_pwd" && return 1; fi
-
-  cd "$_pwd"
-  info "[zip_js_lambda_function] ...done."
-}
-
-get_function_release(){
-  info "[get_function_release] ...( $@ )"
-  local usage_msg=$'get_function_release: retrieves a function release artifact from github:\nusage:\n    get_function_release REPO ARTIFACT'
-
-  if [ -z "$2" ] ; then echo "$usage_msg" && return 1; fi
-  local repo="$1"
-  local artifact="$2"
-
-  _pwd=`pwd`
-  cd "$this_folder"
-
-  curl -s "https://api.github.com/repos/${repo}/releases/latest" \
-  | grep "browser_download_url.*${artifact}" \
-  | cut -d '"' -f 4 | wget -qi -
-
-  cd "$_pwd"
-  info "[get_function_release] ...done."
-}
-
 create_from_template_and_envvars() {
   info "[create_from_template_and_envvars] ...( $@ )"
   local usage_msg=$'create_from_template_and_envvars: creates a file from a template substituting env vars:\nusage:\n    create_from_template_and_envvars TEMPLATE DESTINATION [ENVVARS...]'
@@ -151,23 +65,6 @@ create_from_template_and_envvars() {
   sed "${expression}" "$template" > "$destination"
   if [ ! "$?" -eq "0" ]; then err "[create_from_template_and_envvars] sed command was not successful" && return 1; fi
   info "[create_from_template_and_envvars] ...done."
-}
-
-download_function(){
-  info "[download_function|in] ...( $@ )"
-  local usage_msg=$'download_function: downloads a function release artifact from github:\nusage:\n    download_function REPO ARTIFACT DESTINATION_FILE'
-
-  if [ -z "$3" ] ; then echo "$usage_msg" && return 1; fi
-  local repo="$1"
-  local artifact="$2"
-  local file="$3"
-
-  curl -s "https://api.github.com/repos/${repo}/releases/latest" \
-  | grep "browser_download_url.*${artifact}" \
-  | cut -d '"' -f 4 | wget -O "$file" -qi  -
-  if [ ! "$?" -eq "0" ]; then err "[download_function] curl command was not successful" && return 1; fi
-
-  info "[download_function|out] ...done."
 }
 
 add_entry_to_file()
@@ -226,250 +123,67 @@ add_entry_to_secrets()
   info "[add_entry_to_secrets|out]"
 }
 
-set_databricks_cli_access()
-{ 
-  info "[set_databricks_cli_access|in] ($1, $2)"
-  [ -z "$2" ] && err "no subscription Id provided" && return 1
-  [ -z "$1" ] && err "no workspace url provided" && return 1
+##########################################
+####### ------- terraform -------  #######
+##########################################
 
-  # dd62d6ec-d618-49ad-bd43-04a2ef12c0fb
+terraform_autodeploy(){
+  info "[terraform_autodeploy] ..."
 
-  az login
-  az account set --subscription "$2"
-  token=$(az account get-access-token --resource 2ff814a6-3304-4ab8-85cb-cd0e6f879c1d --query "accessToken" --output tsv)
-  add_entry_to_variables DATABRICKS_HOST "$1"
-  add_entry_to_secrets DATABRICKS_TOKEN "$token"
-  info "[set_databricks_cli_access|out]"
+  [ -z $1 ] && err "[terraform_autodeploy] missing function argument FOLDER" && return 1
+  local folder="$1"
+
+  verify_prereqs terraform
+  if [ ! "$?" -eq "0" ] ; then return 1; fi
+
+  _pwd=$(pwd)
+  cd "$folder"
+
+  terraform init
+  terraform plan
+  terraform apply -auto-approve -lock=true -lock-timeout=10m
+  if [ ! "$?" -eq "0" ]; then err "[terraform_autodeploy] could not apply" && cd "$_pwd" && return 1; fi
+  cd "$_pwd"
+  info "[terraform_autodeploy] ...done."
 }
 
-python_build(){
-  info "[python_build] ..."
+terraform_autodestroy(){
+  info "[terraform_autodestroy] ..."
+
+  [ -z $1 ] && err "[terraform_autodestroy] missing function argument FOLDER" && return 1
+  local folder="$1"
+
+  verify_prereqs terraform
+  if [ ! "$?" -eq "0" ] ; then return 1; fi
+
+  _pwd=$(pwd)
+  cd "$folder"
+
+  terraform destroy -auto-approve -lock=true -lock-timeout=10m
+  if [ ! "$?" -eq "0" ]; then err "[terraform_autodestroy] could not apply" && cd "$_pwd" && return 1; fi
+  cd "$_pwd"
+  info "[terraform_autodestroy] ...done."
+}
+
+##########################################
+#######     ------- js -------     #######
+##########################################
+
+npm_deps(){
+  info "[npm_deps|in] ($1)"
+
+  [ -z $1 ] && err "[npm_deps] missing argument INFRA_DIR" && exit 1
+  local INFRA_DIR="$1"
 
   _pwd=`pwd`
-  cd "$this_folder"
+  cd "$INFRA_DIR"
 
-  rm -rf dist
-  python3 -m build -n
-  [ "$?" -ne "0" ] && err "[python_build] ooppss" && exit 1
+  npm install
 
-  cd "$_pwd"
-  echo "[python_build] ...done."
-}
-
-
-pypi_publish(){
-  info "[pypi_publish|in] ($1, ${2:0:7})"
-
-  [ -z "$2" ] && usage
-  [ -z "$1" ] && usage
-  user="$1"
-  token="$2"
-
-  _pwd=`pwd`
-  cd "$this_folder"
-
-  twine upload -u $user -p $token dist/*
-  [ "$?" -ne "0" ] && err "[pypi_publish] ooppss" && exit 1
-
-  cd "$_pwd"
-  echo "[pypi_publish|out]"
-}
-
-twine_publish(){
-  info "[twine_publish|in] ($1, ${2:0:5}, $3)"
-
-  [ -z "$1" ] || [ -z "$2" ] && usage
-  user="$1"
-  pswd="$2"
-
-  _pwd=`pwd`
-  cd "$this_folder"
-
-  if [ ! -z "$3" ]; then
-    repo_url="$3" 
-    twine upload --verbose -u "${user}" -p "${pswd}" --repository-url "${repo_url}" dist/*.whl 
-  else
-    twine upload --verbose -u "${user}" -p "${pswd}" dist/*.whl 
-  fi
-
-  result=$?
-  cd "$_pwd"
-  [ "$result" -ne "0" ] && err "[twine_publish|out]  => ${result}" && exit 1
-  info "[twine_publish|out] => ${result}"
-}
-
-python_code_lint()
-{
-    info "[python_code_lint|in]"
-
-    src_folders="src test"
-    if [ ! -z "$1" ]; then
-      src_folders="$1"
-    fi
-
-    info "[python_code_lint] ... isort..."
-    isort --profile black -v $src_folders
-    return_value=$?
-    info "[python_code_lint] ... isort...$return_value"
-    if [ "$return_value" -eq "0" ]; then
-      info "[python_code_lint] ... autoflake..."
-      autoflake --remove-all-unused-imports --in-place --recursive -r $src_folders
-      return_value=$?
-      info "[python_code_lint] ... autoflake...$return_value"
-    fi
-    if [ "$return_value" -eq "0" ]; then
-      info "[python_code_lint] ... black..."
-      black -v -t py38 $src_folders
-      return_value=$?
-      info "[python_code_lint] ... black...$return_value"
-    fi
-    [ "$return_value" -ne "0" ] && exit 1
-    info "[python_code_lint|out] => ${return_value}"
-    return ${return_value}
-}
-
-python_code_check()
-{
-    info "[python_code_check|in]"
-
-    src_folders="src test"
-    if [ ! -z "$1" ]; then
-      src_folders="$1"
-    fi
-    
-    info "[python_code_check] ... isort..."
-    isort --profile black -v $src_folders
-    return_value=$?
-    info "[python_code_check] ... isort...$return_value"
-    if [ "$return_value" -eq "0" ]; then
-      info "[python_code_check] ... autoflake..."
-      autoflake --check -r $src_folders
-      return_value=$?
-      info "[python_code_check] ... autoflake...$return_value"
-    fi
-    if [ "$return_value" -eq "0" ]; then
-      info "[python_code_check] ... black..."
-      black --check $src_folders
-      return_value=$?
-      info "[python_code_check] ... black...$return_value"
-    fi
-    [ "$return_value" -ne "0" ] && exit 1
-    info "[python_code_check|out] => ${return_value}"
-    return ${return_value}
-}
-
-print_pytest_coverage()
-{
-  info "[print_pytest_coverage|in]"
-  coverage report -m
   result="$?"
-  [ "$result" -ne "0" ] && exit 1
-  info "[print_pytest_coverage|out] => $result"
-  return ${result}
-}
-
-check_pytest_coverage()
-{
-  info "[check_pytest_coverage|in] ($1)"
-
-  [ -z "$1" ] && usage
-
-  local threshold=$1
-  score=$(coverage report | awk '$1 == "TOTAL" {print $NF+0}')
-   result="$?"
-  [ "$result" -ne "0" ] && exit 1
-  if (( $threshold > $score )); then
-    err "[check_pytest_coverage] $score doesn't meet $threshold"
-    exit 1
-  fi
-  info "[check_pytest_coverage|out] => $score"
-}
-
-python_test()
-{
-    info "[python_test|in] ($1)"
-    python -m pytest -x -s -vv --durations=0 --cov=src --junitxml=tests-results.xml --cov-report=xml --cov-report=html "$1"
-    return_value="$?"
-    [ "$return_value" -ne "0" ] && exit 1
-    info "[python_test|out] => ${return_value}"
-    return ${return_value}
-}
-
-python_reqs()
-{
-    info "[python_reqs|in] ($1)"
-
-    local REQS_FILE=requirements.txt
-    if [ ! -z $1 ]; then
-      REQS_FILE="$1"
-    fi
-
-    pip install -r "$REQS_FILE"
-    [ "$?" -ne "0" ] && exit 1
-    info "[python_reqs|out]"
-}
-
-cdk_infra()
-{
-  # usage:
-  #    $(basename $0) { operation } [infrastructure_folder]
-  #      options:
-  #      - operation: { on | off }
-  #      - infrastructure_folder: default=infrastructure 
-  info "[cdk_infra|in] ($1) ($2)"
-
-  [ -z $1 ] && usage
-  [ "$1" != "on" ] && [ "$1" != "off" ]&& [ "$1" != "bootstrap" ] && usage
-  local operation="$1"
-  local tf_dir="${DEFAULT_INFRA_DIR}"
-  if [ ! -z $2 ]; then
-    local tf_dir="$2"
-  else
-    info "[cdk_infra] assuming default infra folder: ${DEFAULT_INFRA_DIR}"
-  fi
-
-  if [ ! -z $3 ]; then
-    local stacks="$3"
-  else
-    local stacks="--all"
-  fi
-
-  _pwd=`pwd`
-  cd "$tf_dir"
-
-  if [ "$operation" == "on" ]; then
-    cdk synth "$stacks"
-    [ "$?" -ne "0" ] && err "[infra] couldn't synth" && cd "$_pwd" && exit 1
-    cdk deploy "$stacks" --require-approval=never -v --debug
-    [ "$?" -ne "0" ] && err "[infra] couldn't deploy" && cd "$_pwd" && exit 1
-  elif [ "$operation" == "off" ]; then
-    cdk destroy "$stacks" --force
-    [ "$?" -ne "0" ] && err "[infra] couldn't destroy" && cd "$_pwd" && exit 1
-  elif [ "$operation" == "bootstrap" ]; then
-    cdk bootstrap --force --termination-protection false
-    [ "$?" -ne "0" ] && err "[infra] couldn't bootstrap" && cd "$_pwd" && exit 1
-  fi
-
   cd "$_pwd"
-  info "[cdk_infra|out]"
-}
-
-cdk_setup()
-{
-    info "[cdk_setup|in] ($1)"
-    local tf_dir="${DEFAULT_INFRA_DIR}"
-    if [ ! -z $1 ]; then
-      local tf_dir="$1"
-    else
-      info "[cdk_setup] assuming default infra folder: ${DEFAULT_INFRA_DIR}"
-    fi
-    _pwd=`pwd`
-    cd "$tf_dir"
-    npm install
-    result="$?"
-    cd "$_pwd"
-    [ "$result" -ne "0" ] && err "[cdk_setup|out]  => ${result}" && exit 1
-    info "[cdk_setup|out] => ${result}"
+  [ "$result" -ne "0" ] && err "[npm_deps|out]  => ${result}" && exit 1
+  info "[npm_deps|out] => ${result}"
 }
 
 npm_publish(){
@@ -490,114 +204,6 @@ npm_publish(){
   cd "$_pwd"
   info "[npm_publish] ...done."
 }
-
-cdk_global_reqs(){
-  info "[cdk_global_reqs|in] ($1, $2, $3, $4, $5, $6)"
-
-  [ -z $1 ] && err "[cdk_global_reqs] missing argument TYPESCRIPT_VERSION" && return 1
-  local TYPESCRIPT_VERSION="$1"
-  [ -z $2 ] && err "[cdk_global_reqs] missing argument CDK_VERSION" && return 1
-  local CDK_VERSION="$2"
-  [ -z $3 ] && err "[cdk_global_reqs] missing argument TS_NODE_VERSION" && return 1
-  local TS_NODE_VERSION="$3"
-  [ -z $4 ] && err "[cdk_global_reqs] missing argument INTEG_RUNNER_VERSION" && return 1
-  local INTEG_RUNNER_VERSION="$4"
-  [ -z $5 ] && err "[cdk_global_reqs] missing argument INTEG_TESTS_ALPHA_VERSION" && return 1
-  local INTEG_TESTS_ALPHA_VERSION="$5"
-  [ -z $6 ] && err "[cdk_global_reqs] missing argument JEST_VERSION" && return 1
-  local JEST_VERSION="$6"
-
-  npm install -g "typescript@${TYPESCRIPT_VERSION}" "aws-cdk@${CDK_VERSION}" "ts-node@${TS_NODE_VERSION}" \
-   "@aws-cdk/integ-runner@${INTEG_RUNNER_VERSION}" "@aws-cdk/integ-tests-alpha@${INTEG_TESTS_ALPHA_VERSION}" \
-   "jest@${JEST_VERSION}"
-  result="$?"
-  [ "$result" -ne "0" ] && err "[cdk_global_reqs|out]  => ${result}" && exit 1
-  info "[cdk_global_reqs|out] => ${result}"
-}
-
-cdk_scaffolding(){
-  info "[cdk_scaffolding|in] ($1)"
-
-  [ -z $1 ] && err "[cdk_scaffolding] missing argument INFRA_DIR" && exit 1
-  local INFRA_DIR="$1"
-
-  _pwd=`pwd`
-  cd "$INFRA_DIR"
-
-  cdk init app --language typescript
-
-  result="$?"
-  cd "$_pwd"
-  [ "$result" -ne "0" ] && err "[cdk_scaffolding|out]  => ${result}" && exit 1
-  info "[cdk_scaffolding|out] => ${result}"
-}
-
-infra_cdk_bootstrap(){
-  info "[infra_cdk_bootstrap|in] ($1, $2, $3, $4, $5, $6)"
-
-  [ -z $1 ] && err "[infra_cdk_bootstrap] missing argument TYPESCRIPT_VERSION" && return 1
-  local TYPESCRIPT_VERSION="$1"
-  [ -z $2 ] && err "[infra_cdk_bootstrap] missing argument CDK_VERSION" && return 1
-  local CDK_VERSION="$2"
-  [ -z $3 ] && err "[infra_cdk_bootstrap] missing argument TS_NODE_VERSION" && return 1
-  local TS_NODE_VERSION="$3"
-  [ -z $4 ] && err "[infra_cdk_bootstrap] missing argument INTEG_RUNNER_VERSION" && return 1
-  local INTEG_RUNNER_VERSION="$4"
-  [ -z $5 ] && err "[infra_cdk_bootstrap] missing argument INTEG_TESTS_ALPHA_VERSION" && return 1
-  local INTEG_TESTS_ALPHA_VERSION="$5"
-  [ -z $6 ] && err "[cdk_global_reqs] missing argument JEST_VERSION" && return 1
-  local JEST_VERSION="$6"
-  [ -z $7 ] && err "[infra_cdk_bootstrap] missing argument INFRA_DIR" && return 1
-  local INFRA_DIR="$7"
-
-  cdk_global_reqs "$TYPESCRIPT_VERSION" "$CDK_VERSION" "$TS_NODE_VERSION" "$INTEG_RUNNER_VERSION" \
-    "$INTEG_TESTS_ALPHA_VERSION" "$JEST_VERSION"  && cdk_scaffolding "$INFRA_DIR"
-
-  result="$?"
-  [ "$result" -ne "0" ] && err "[infra_cdk_bootstrap|out]  => ${result}" && exit 1
-  info "[infra_cdk_bootstrap|out] => ${result}"
-}
-
-
-
-
-npm_deps(){
-  info "[npm_deps|in] ($1)"
-
-  [ -z $1 ] && err "[npm_deps] missing argument INFRA_DIR" && exit 1
-  local INFRA_DIR="$1"
-
-  _pwd=`pwd`
-  cd "$INFRA_DIR"
-
-  npm install
-
-  result="$?"
-  cd "$_pwd"
-  [ "$result" -ne "0" ] && err "[npm_deps|out]  => ${result}" && exit 1
-  info "[npm_deps|out] => ${result}"
-}
-
-
-
-test_js_lambda(){
-  info "[test_js_lambda|in] ({$1})"
-
-  [ -z $1 ] && err "[get_cloudfront_cidr] missing argument FUNCTION_DIR" && exit 1
-  local FUNCTION_DIR="$1"
-  _pwd=`pwd`
-  cd "$FUNCTION_DIR"
-
-  npm install
-  jest
-
-  result="$?"
-  cd "$_pwd"
-  [ "$result" -ne "0" ] && err "[test_js_lambda|out]  => ${result}" && exit 1
-  info "[test_js_lambda|out] => ${result}"
-}
-
-
 
 ##########################################
 #######     ------- aws -------    #######
@@ -665,14 +271,149 @@ aws_set_profile(){
 }
 
 ##########################################
+#######     ------- cdk -------    #######
+##########################################
+
+cdk_global_reqs(){
+  info "[cdk_global_reqs|in] ($1, $2, $3, $4, $5, $6)"
+
+  [ -z $1 ] && err "[cdk_global_reqs] missing argument TYPESCRIPT_VERSION" && return 1
+  local TYPESCRIPT_VERSION="$1"
+  [ -z $2 ] && err "[cdk_global_reqs] missing argument CDK_VERSION" && return 1
+  local CDK_VERSION="$2"
+  [ -z $3 ] && err "[cdk_global_reqs] missing argument TS_NODE_VERSION" && return 1
+  local TS_NODE_VERSION="$3"
+  [ -z $4 ] && err "[cdk_global_reqs] missing argument INTEG_RUNNER_VERSION" && return 1
+  local INTEG_RUNNER_VERSION="$4"
+  [ -z $5 ] && err "[cdk_global_reqs] missing argument INTEG_TESTS_ALPHA_VERSION" && return 1
+  local INTEG_TESTS_ALPHA_VERSION="$5"
+  [ -z $6 ] && err "[cdk_global_reqs] missing argument JEST_VERSION" && return 1
+  local JEST_VERSION="$6"
+
+  npm install -g "typescript@${TYPESCRIPT_VERSION}" "aws-cdk@${CDK_VERSION}" "ts-node@${TS_NODE_VERSION}" \
+   "@aws-cdk/integ-runner@${INTEG_RUNNER_VERSION}" "@aws-cdk/integ-tests-alpha@${INTEG_TESTS_ALPHA_VERSION}" \
+   "jest@${JEST_VERSION}"
+  result="$?"
+  [ "$result" -ne "0" ] && err "[cdk_global_reqs|out]  => ${result}" && exit 1
+  info "[cdk_global_reqs|out] => ${result}"
+}
+
+cdk_scaffolding(){
+  info "[cdk_scaffolding|in] ($1)"
+
+  [ -z $1 ] && err "[cdk_scaffolding] missing argument INFRA_DIR" && exit 1
+  local INFRA_DIR="$1"
+
+  _pwd=`pwd`
+  cd "$INFRA_DIR"
+
+  cdk init app --language typescript
+
+  result="$?"
+  cd "$_pwd"
+  [ "$result" -ne "0" ] && err "[cdk_scaffolding|out]  => ${result}" && exit 1
+  info "[cdk_scaffolding|out] => ${result}"
+}
+
+cdk_infra_bootstrap(){
+  info "[cdk_infra_bootstrap|in] ($1, $2, $3, $4, $5, $6)"
+
+  [ -z $1 ] && err "[cdk_infra_bootstrap] missing argument TYPESCRIPT_VERSION" && return 1
+  local TYPESCRIPT_VERSION="$1"
+  [ -z $2 ] && err "[cdk_infra_bootstrap] missing argument CDK_VERSION" && return 1
+  local CDK_VERSION="$2"
+  [ -z $3 ] && err "[cdk_infra_bootstrap] missing argument TS_NODE_VERSION" && return 1
+  local TS_NODE_VERSION="$3"
+  [ -z $4 ] && err "[cdk_infra_bootstrap] missing argument INTEG_RUNNER_VERSION" && return 1
+  local INTEG_RUNNER_VERSION="$4"
+  [ -z $5 ] && err "[cdk_infra_bootstrap] missing argument INTEG_TESTS_ALPHA_VERSION" && return 1
+  local INTEG_TESTS_ALPHA_VERSION="$5"
+  [ -z $6 ] && err "[cdk_infra_bootstrap] missing argument JEST_VERSION" && return 1
+  local JEST_VERSION="$6"
+  [ -z $7 ] && err "[cdk_infra_bootstrap] missing argument INFRA_DIR" && return 1
+  local INFRA_DIR="$7"
+
+  cdk_global_reqs "$TYPESCRIPT_VERSION" "$CDK_VERSION" "$TS_NODE_VERSION" "$INTEG_RUNNER_VERSION" \
+    "$INTEG_TESTS_ALPHA_VERSION" "$JEST_VERSION"  && cdk_scaffolding "$INFRA_DIR"
+
+  result="$?"
+  [ "$result" -ne "0" ] && err "[cdk_infra_bootstrap|out]  => ${result}" && exit 1
+  info "[cdk_infra_bootstrap|out] => ${result}"
+}
+
+cdk_infra()
+{
+  # usage:
+  #    $(basename $0) { operation } [infrastructure_folder]
+  #      options:
+  #      - operation: { on | off }
+  #      - infrastructure_folder: default=infrastructure 
+  info "[cdk_infra|in] ($1) ($2)"
+
+  [ -z $1 ] && usage
+  [ "$1" != "on" ] && [ "$1" != "off" ]&& [ "$1" != "bootstrap" ] && usage
+  local operation="$1"
+  local tf_dir="${DEFAULT_INFRA_DIR}"
+  if [ ! -z $2 ]; then
+    local tf_dir="$2"
+  else
+    info "[cdk_infra] assuming default infra folder: ${DEFAULT_INFRA_DIR}"
+  fi
+
+  if [ ! -z $3 ]; then
+    local stacks="$3"
+  else
+    local stacks="--all"
+  fi
+
+  _pwd=`pwd`
+  cd "$tf_dir"
+
+  if [ "$operation" == "on" ]; then
+    cdk synth "$stacks"
+    [ "$?" -ne "0" ] && err "[infra] couldn't synth" && cd "$_pwd" && exit 1
+    cdk deploy "$stacks" --require-approval=never -v --debug
+    [ "$?" -ne "0" ] && err "[infra] couldn't deploy" && cd "$_pwd" && exit 1
+  elif [ "$operation" == "off" ]; then
+    cdk destroy "$stacks" --force
+    [ "$?" -ne "0" ] && err "[infra] couldn't destroy" && cd "$_pwd" && exit 1
+  elif [ "$operation" == "bootstrap" ]; then
+    cdk bootstrap --force --termination-protection false
+    [ "$?" -ne "0" ] && err "[infra] couldn't bootstrap" && cd "$_pwd" && exit 1
+  fi
+
+  cd "$_pwd"
+  info "[cdk_infra|out]"
+}
+
+cdk_setup()
+{
+    info "[cdk_setup|in] ($1)"
+    local tf_dir="${DEFAULT_INFRA_DIR}"
+    if [ ! -z $1 ]; then
+      local tf_dir="$1"
+    else
+      info "[cdk_setup] assuming default infra folder: ${DEFAULT_INFRA_DIR}"
+    fi
+    _pwd=`pwd`
+    cd "$tf_dir"
+    npm install
+    result="$?"
+    cd "$_pwd"
+    [ "$result" -ne "0" ] && err "[cdk_setup|out]  => ${result}" && exit 1
+    info "[cdk_setup|out] => ${result}"
+}
+
+##########################################
 #######   ------- python -------   #######
 ##########################################
-py_add_pip_index_to_requirements(){
-  info "[py_add_pip_index_to_requirements|in] ($1, $2)"
 
-  [ -z $1 ] && err "[py_add_pip_index_to_requirements] missing argument EXTRA_INDEX_URL" && exit 1
+python_add_pip_index_to_requirements(){
+  info "[python_add_pip_index_to_requirements|in] ($1, $2)"
+
+  [ -z $1 ] && err "[python_add_pip_index_to_requirements] missing argument EXTRA_INDEX_URL" && exit 1
   local EXTRA_INDEX_URL="$1"
-  [ -z $2 ] && err "[py_add_pip_index_to_requirements] missing argument REQS_FILE" && exit 1
+  [ -z $2 ] && err "[python_add_pip_index_to_requirements] missing argument REQS_FILE" && exit 1
   local REQS_FILE="$2"
   local OLD_REQS_FILE="${REQS_FILE}_old"
 
@@ -681,11 +422,212 @@ py_add_pip_index_to_requirements(){
   cat "$OLD_REQS_FILE" >> "$REQS_FILE"
   result="$?"
 
-  [ "$result" -ne "0" ] && err "[py_add_pip_index_to_requirements|out] could not add the line" && exit 1
-  info "[py_add_pip_index_to_requirements|out] => ${result}"
+  [ "$result" -ne "0" ] && err "[python_add_pip_index_to_requirements|out] could not add the line" && exit 1
+  info "[python_add_pip_index_to_requirements|out] => ${result}"
 }
 
+python_build(){
+  info "[python_build] ..."
 
+  _pwd=`pwd`
+  cd "$this_folder"
+
+  rm -rf dist
+  python3 -m build -n
+  [ "$?" -ne "0" ] && err "[python_build] ooppss" && exit 1
+
+  cd "$_pwd"
+  echo "[python_build] ...done."
+}
+
+python_pypi_publish(){
+  info "[python_pypi_publish|in] ($1, ${2:0:7})"
+
+  [ -z "$2" ] && usage
+  [ -z "$1" ] && usage
+  user="$1"
+  token="$2"
+
+  _pwd=`pwd`
+  cd "$this_folder"
+
+  twine upload -u $user -p $token dist/*
+  [ "$?" -ne "0" ] && err "[python_pypi_publish] ooppss" && exit 1
+
+  cd "$_pwd"
+  echo "[python_pypi_publish|out]"
+}
+
+python_twine_publish(){
+  info "[python_twine_publish|in] ($1, ${2:0:5}, $3)"
+
+  [ -z "$1" ] || [ -z "$2" ] && usage
+  user="$1"
+  pswd="$2"
+
+  _pwd=`pwd`
+  cd "$this_folder"
+
+  if [ ! -z "$3" ]; then
+    repo_url="$3" 
+    twine upload --verbose -u "${user}" -p "${pswd}" --repository-url "${repo_url}" dist/*.whl 
+  else
+    twine upload --verbose -u "${user}" -p "${pswd}" dist/*.whl 
+  fi
+
+  result=$?
+  cd "$_pwd"
+  [ "$result" -ne "0" ] && err "[python_twine_publish|out]  => ${result}" && exit 1
+  info "[python_twine_publish|out] => ${result}"
+}
+
+python_code_lint()
+{
+    info "[python_code_lint|in]"
+
+    src_folders="src test"
+    if [ ! -z "$1" ]; then
+      src_folders="$1"
+    fi
+
+    info "[python_code_lint] ... isort..."
+    isort --profile black -v $src_folders
+    return_value=$?
+    info "[python_code_lint] ... isort...$return_value"
+    if [ "$return_value" -eq "0" ]; then
+      info "[python_code_lint] ... autoflake..."
+      autoflake --remove-all-unused-imports --in-place --recursive -r $src_folders
+      return_value=$?
+      info "[python_code_lint] ... autoflake...$return_value"
+    fi
+    if [ "$return_value" -eq "0" ]; then
+      info "[python_code_lint] ... black..."
+      black -v -t py38 $src_folders
+      return_value=$?
+      info "[python_code_lint] ... black...$return_value"
+    fi
+    [ "$return_value" -ne "0" ] && exit 1
+    info "[python_code_lint|out] => ${return_value}"
+    return ${return_value}
+}
+
+python_code_check()
+{
+    info "[python_code_check|in]"
+
+    src_folders="src test"
+    if [ ! -z "$1" ]; then
+      src_folders="$1"
+    fi
+    
+    info "[python_code_check] ... isort..."
+    isort --profile black -v $src_folders
+    return_value=$?
+    info "[python_code_check] ... isort...$return_value"
+    if [ "$return_value" -eq "0" ]; then
+      info "[python_code_check] ... autoflake..."
+      autoflake --check -r $src_folders
+      return_value=$?
+      info "[python_code_check] ... autoflake...$return_value"
+    fi
+    if [ "$return_value" -eq "0" ]; then
+      info "[python_code_check] ... black..."
+      black --check $src_folders
+      return_value=$?
+      info "[python_code_check] ... black...$return_value"
+    fi
+    [ "$return_value" -ne "0" ] && exit 1
+    info "[python_code_check|out] => ${return_value}"
+    return ${return_value}
+}
+
+python_print_coverage()
+{
+  info "[python_print_coverage|in]"
+  coverage report -m
+  result="$?"
+  [ "$result" -ne "0" ] && exit 1
+  info "[python_print_coverage|out] => $result"
+  return ${result}
+}
+
+python_check_coverage()
+{
+  info "[python_check_coverage|in] ($1)"
+
+  [ -z "$1" ] && usage
+
+  local threshold=$1
+  score=$(coverage report | awk '$1 == "TOTAL" {print $NF+0}')
+   result="$?"
+  [ "$result" -ne "0" ] && exit 1
+  if (( $threshold > $score )); then
+    err "[python_check_coverage] $score doesn't meet $threshold"
+    exit 1
+  fi
+  info "[python_check_coverage|out] => $score"
+}
+
+python_test()
+{
+    info "[python_test|in] ($1)"
+    python -m pytest -x -s -vv --durations=0 --cov=src --junitxml=tests-results.xml --cov-report=xml --cov-report=html "$1"
+    return_value="$?"
+    [ "$return_value" -ne "0" ] && exit 1
+    info "[python_test|out] => ${return_value}"
+    return ${return_value}
+}
+
+python_reqs()
+{
+    info "[python_reqs|in] ($1)"
+
+    local REQS_FILE=requirements.txt
+    if [ ! -z $1 ]; then
+      REQS_FILE="$1"
+    fi
+
+    pip install -r "$REQS_FILE"
+    [ "$?" -ne "0" ] && exit 1
+    info "[python_reqs|out]"
+}
+
+python_hatch_build(){
+  echo "[python_hatch_build] ($1)..."
+
+  local ROOT_DIR="$this_folder"
+  if [ ! -z $1 ]; then
+    ROOT_DIR="$1"
+  fi
+
+  _pwd=`pwd`
+  cd "$ROOT_DIR"
+
+  rm -rf dist
+  hatch build
+  if [ ! "$?" -eq "0" ] ; then echo "[python_hatch_build] could not build" && cd "$_pwd" && exit 1; fi
+
+  cd "$_pwd"
+  echo "[python_hatch_build] ...done."
+}
+
+python_hatch_publish(){
+  echo "[python_hatch_publish] ($1)..."
+
+  local ROOT_DIR="$this_folder"
+  if [ ! -z $1 ]; then
+    ROOT_DIR="$1"
+  fi
+
+  _pwd=`pwd`
+  cd "$ROOT_DIR"
+
+  hatch publish -n dist
+  if [ ! "$?" -eq "0" ] ; then echo "[python_hatch_publish] could not publish" && cd "$_pwd" && exit 1; fi
+
+  cd "$_pwd"
+  echo "[python_hatch_publish] ...done."
+}
 
 ##########################################
 #######   ------- azure -------    #######
@@ -787,6 +729,22 @@ az_upload_static_website(){
 ##########################################
 ####### ------- databricks ------- #######
 ##########################################
+
+databricks_set_cli_access()
+{ 
+  info "[databricks_set_cli_access|in] ($1, $2)"
+  [ -z "$2" ] && err "no subscription Id provided" && return 1
+  [ -z "$1" ] && err "no workspace url provided" && return 1
+
+  # dd62d6ec-d618-49ad-bd43-04a2ef12c0fb
+
+  az login
+  az account set --subscription "$2"
+  token=$(az account get-access-token --resource 2ff814a6-3304-4ab8-85cb-cd0e6f879c1d --query "accessToken" --output tsv)
+  add_entry_to_variables DATABRICKS_HOST "$1"
+  add_entry_to_secrets DATABRICKS_TOKEN "$token"
+  info "[databricks_set_cli_access|out]"
+}
 
 databricks_bundle_deploy(){
   info "[databricks_bundle_deploy|in]"
@@ -901,3 +859,92 @@ commands() {
 
 EOM
 }
+
+##########################################
+#######  ------- assorted -------  #######
+##########################################
+
+test_js_lambda(){
+  info "[test_js_lambda|in] ({$1})"
+
+  [ -z $1 ] && err "[get_cloudfront_cidr] missing argument FUNCTION_DIR" && exit 1
+  local FUNCTION_DIR="$1"
+  _pwd=`pwd`
+  cd "$FUNCTION_DIR"
+
+  npm install
+  jest
+
+  result="$?"
+  cd "$_pwd"
+  [ "$result" -ne "0" ] && err "[test_js_lambda|out]  => ${result}" && exit 1
+  info "[test_js_lambda|out] => ${result}"
+}
+
+zip_js_lambda_function(){
+  info "[zip_js_lambda_function] ...( $@ )"
+  local usage_msg=$'zip_js_lambda_function: zips a js lambda function:\nusage:\n    zip_js_lambda_function SRC_DIR ZIP_FILE { FILES FOLDERS ... }'
+
+  verify_prereqs npm
+  if [ ! "$?" -eq "0" ] ; then return 1; fi
+
+  if [ -z "$3" ] ; then echo "$usage_msg" && return 1; fi
+
+  local src_dir="$1"
+  local zip_file="$2"
+  local files="${@:3}"
+  local AWS_SDK_MODULE_PATH=$src_dir/node_modules/aws-sdk
+
+  _pwd=`pwd`
+  cd "$src_dir"
+
+  if [ -f "package.json" ]; then
+    npm install &>/dev/null
+    if [ ! "$?" -eq "0" ] ; then err "[zip_js_lambda_function] could not install dependencies" && cd "$_pwd" && return 1; fi
+    if [ -d "${AWS_SDK_MODULE_PATH}" ]; then rm -r "$AWS_SDK_MODULE_PATH"; fi
+  fi
+
+  rm -f "$zip_file"
+  zip -9 -q -r "$zip_file" "$files" &>/dev/null
+  if [ ! "$?" -eq "0" ] ; then err "[zip_js_lambda_function] could not zip it" && cd "$_pwd" && return 1; fi
+
+  cd "$_pwd"
+  info "[zip_js_lambda_function] ...done."
+}
+
+get_function_release(){
+  info "[get_function_release] ...( $@ )"
+  local usage_msg=$'get_function_release: retrieves a function release artifact from github:\nusage:\n    get_function_release REPO ARTIFACT'
+
+  if [ -z "$2" ] ; then echo "$usage_msg" && return 1; fi
+  local repo="$1"
+  local artifact="$2"
+
+  _pwd=`pwd`
+  cd "$this_folder"
+
+  curl -s "https://api.github.com/repos/${repo}/releases/latest" \
+  | grep "browser_download_url.*${artifact}" \
+  | cut -d '"' -f 4 | wget -qi -
+
+  cd "$_pwd"
+  info "[get_function_release] ...done."
+}
+
+download_function(){
+  info "[download_function|in] ...( $@ )"
+  local usage_msg=$'download_function: downloads a function release artifact from github:\nusage:\n    download_function REPO ARTIFACT DESTINATION_FILE'
+
+  if [ -z "$3" ] ; then echo "$usage_msg" && return 1; fi
+  local repo="$1"
+  local artifact="$2"
+  local file="$3"
+
+  curl -s "https://api.github.com/repos/${repo}/releases/latest" \
+  | grep "browser_download_url.*${artifact}" \
+  | cut -d '"' -f 4 | wget -O "$file" -qi  -
+  if [ ! "$?" -eq "0" ]; then err "[download_function] curl command was not successful" && return 1; fi
+
+  info "[download_function|out] ...done."
+}
+
