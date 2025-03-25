@@ -123,6 +123,22 @@ add_entry_to_secrets()
   info "[add_entry_to_secrets|out]"
 }
 
+git_tag_and_push()
+{
+  info "[git_tag_and_push|in] ($1, ${2:0:7})"
+
+  [ -z "$1" ] && err "must provide parameter VERSION" && exit 1
+  local VERSION="$1"
+  [ -z "$2" ] && err "must provide parameter COMMIT_HASH" && exit 1
+  local COMMIT_HASH="$2"
+
+  git tag -a "$VERSION" "$COMMIT_HASH" -m "release $VERSION" && git push --tags
+  result="$?"
+  [ "$result" -ne "0" ] && err "[git_tag_and_push|out] could not tag and push" && exit 1
+
+  info "[git_tag_and_push|out] => ${result}"
+}
+
 ##########################################
 ####### ------- terraform -------  #######
 ##########################################
