@@ -397,8 +397,14 @@ python_test()
 
 python_reqs()
 {
-    info "[python_reqs|in]"
-    pip install -r requirements.txt
+    info "[python_reqs|in] ($1)"
+
+    local REQS_FILE=requirements.txt
+    if [ ! -z $1 ]; then
+      REQS_FILE="$1"
+    fi
+
+    pip install -r "$REQS_FILE"
     [ "$?" -ne "0" ] && exit 1
     info "[python_reqs|out]"
 }
@@ -553,34 +559,7 @@ infra_cdk_bootstrap(){
 }
 
 
-set_aws_profile(){
-  info "[set_aws_profile|in] ($1, $2, ${3:0:5}, $4, $5)"
 
-  [ -z $1 ] && err "[set_aws_profile] missing argument PROFILE" && return 1
-  local PROFILE="$1"
-  [ -z $2 ] && err "[set_aws_profile] missing argument KEY" && return 1
-  local KEY="$2"
-  [ -z $3 ] && err "[set_aws_profile] missing argument SECRET" && return 1
-  local SECRET="$3"
-  [ -z $4 ] && err "[set_aws_profile] missing argument REGION" && return 1
-  local REGION="$4"
-
-  if [ ! -z $5 ]; then
-    local OUTPUT="$5"
-  else
-    local OUTPUT="json"
-  fi
-
-  aws configure --profile $PROFILE set region $REGION \
-    && aws configure --profile $PROFILE set output $OUTPUT \
-    && aws configure --profile $PROFILE set aws_secret_access_key $SECRET \
-    && aws configure --profile $PROFILE set aws_access_key_id $KEY
-
-  result="$?"
-  cd "$_pwd"
-  [ "$result" -ne "0" ] && err "[set_aws_profile|out]  => ${result}" && exit 1
-  info "[set_aws_profile|out] => ${result}"
-}
 
 npm_deps(){
   info "[npm_deps|in] ($1)"
@@ -599,20 +578,7 @@ npm_deps(){
   info "[npm_deps|out] => ${result}"
 }
 
-get_cloudfront_cidr(){
-  info "[get_cloudfront_cidr|in] ($1)"
 
-  [ -z $1 ] && err "[get_cloudfront_cidr] missing argument OUTPUT_FILE" && exit 1
-  local OUTPUT_FILE="$1"
-
-  local prefix_list_id=$(aws ec2 describe-managed-prefix-lists | jq -r ".\"PrefixLists\" | .[] | select(.PrefixListName == \"com.amazonaws.global.cloudfront.origin-facing\") | .PrefixListId")
-  local outputs=$(aws ec2 get-managed-prefix-list-entries --prefix-list-id "$prefix_list_id" --output json)
-  echo $outputs | jq -r ".\"Entries\"" > "$OUTPUT_FILE"
-
-  result="$?"
-  [ "$result" -ne "0" ] && err "[get_cloudfront_cidr|out]  => ${result}" && exit 1
-  info "[get_cloudfront_cidr|out] => ${result}"
-}
 
 test_js_lambda(){
   info "[test_js_lambda|in] ({$1})"
@@ -631,22 +597,196 @@ test_js_lambda(){
   info "[test_js_lambda|out] => ${result}"
 }
 
-find_kms_alias(){
-  echo "[find_kms_alias|in] ($1)"
 
-  [ -z $1 ] && err "[find_kms_alias] missing argument ALIAS" && exit 1
+
+##########################################
+#######     ------- aws -------    #######
+##########################################
+
+aws_find_kms_alias(){
+  echo "[aws_find_kms_alias|in] ($1)"
+
+  [ -z $1 ] && err "[aws_find_kms_alias] missing argument ALIAS" && exit 1
   local ALIAS="$1"
   result=1
 
   local alias_resource=$(aws kms list-aliases | jq -r ".\"Aliases\" | .[] | select(.AliasName == \"$ALIAS\") | .AliasName")
-  echo "[find_kms_alias] alias_resource: ${alias_resource}"
+  echo "[aws_find_kms_alias] alias_resource: ${alias_resource}"
   if [ "$alias_resource" != "" ]; then
     result=0
   fi
 
-  echo "[find_kms_alias|out] => ${result}"
+  echo "[aws_find_kms_alias|out] => ${result}"
   return ${result}
 }
+
+aws_get_cloudfront_cidr(){
+  info "[aws_get_cloudfront_cidr|in] ($1)"
+
+  [ -z $1 ] && err "[aws_get_cloudfront_cidr] missing argument OUTPUT_FILE" && exit 1
+  local OUTPUT_FILE="$1"
+
+  local prefix_list_id=$(aws ec2 describe-managed-prefix-lists | jq -r ".\"PrefixLists\" | .[] | select(.PrefixListName == \"com.amazonaws.global.cloudfront.origin-facing\") | .PrefixListId")
+  local outputs=$(aws ec2 get-managed-prefix-list-entries --prefix-list-id "$prefix_list_id" --output json)
+  echo $outputs | jq -r ".\"Entries\"" > "$OUTPUT_FILE"
+
+  result="$?"
+  [ "$result" -ne "0" ] && err "[aws_get_cloudfront_cidr|out]  => ${result}" && exit 1
+  info "[aws_get_cloudfront_cidr|out] => ${result}"
+}
+
+aws_set_profile(){
+  info "[aws_set_profile|in] ($1, $2, ${3:0:5}, $4, $5)"
+
+  [ -z $1 ] && err "[aws_set_profile] missing argument PROFILE" && return 1
+  local PROFILE="$1"
+  [ -z $2 ] && err "[aws_set_profile] missing argument KEY" && return 1
+  local KEY="$2"
+  [ -z $3 ] && err "[aws_set_profile] missing argument SECRET" && return 1
+  local SECRET="$3"
+  [ -z $4 ] && err "[aws_set_profile] missing argument REGION" && return 1
+  local REGION="$4"
+
+  if [ ! -z $5 ]; then
+    local OUTPUT="$5"
+  else
+    local OUTPUT="json"
+  fi
+
+  aws configure --profile $PROFILE set region $REGION \
+    && aws configure --profile $PROFILE set output $OUTPUT \
+    && aws configure --profile $PROFILE set aws_secret_access_key $SECRET \
+    && aws configure --profile $PROFILE set aws_access_key_id $KEY
+
+  result="$?"
+  cd "$_pwd"
+  [ "$result" -ne "0" ] && err "[aws_set_profile|out]  => ${result}" && exit 1
+  info "[aws_set_profile|out] => ${result}"
+}
+
+##########################################
+#######   ------- python -------   #######
+##########################################
+py_add_pip_index_to_requirements(){
+  info "[py_add_pip_index_to_requirements|in] ($1, $2)"
+
+  [ -z $1 ] && err "[py_add_pip_index_to_requirements] missing argument EXTRA_INDEX_URL" && exit 1
+  local EXTRA_INDEX_URL="$1"
+  [ -z $2 ] && err "[py_add_pip_index_to_requirements] missing argument REQS_FILE" && exit 1
+  local REQS_FILE="$2"
+  local OLD_REQS_FILE="${REQS_FILE}_old"
+
+  cat "$REQS_FILE" > "$OLD_REQS_FILE"
+  echo "--extra-index-url $EXTRA_INDEX_URL" > "$REQS_FILE"
+  cat "$OLD_REQS_FILE" >> "$REQS_FILE"
+  result="$?"
+
+  [ "$result" -ne "0" ] && err "[py_add_pip_index_to_requirements|out] could not add the line" && exit 1
+  info "[py_add_pip_index_to_requirements|out] => ${result}"
+}
+
+
+
+##########################################
+#######   ------- azure -------    #######
+##########################################
+
+az_sp_assign_subscription()
+{
+  info "[az_sp_assign_subscription|in]"
+  az role assignment create --assignee "${APP_ID}" --role "Contributor" --scope "/subscriptions/${ARM_SUBSCRIPTION_ID}"
+  info "[az_sp_assign_subscription|out]"
+}
+
+az_sp_login()
+{
+  info "[az_sp_login|in]"
+  az login --service-principal -u "${APP_ID}" -p "${ARM_CLIENT_SECRET}" --tenant "${ARM_TENANT_ID}" #--subscription "${ARM_SUBSCRIPTION_ID}"
+  info "[az_sp_login|out]"
+}
+
+az_login_check()
+{
+  info "[az_login_check|in]"
+  az vm list-sizes --location westus
+  info "[az_login_check|out]"
+}
+
+az_logout()
+{
+  info "[az_logout|in]"
+  az logout
+  info "[az_logout|out]"
+}
+
+az_list_sp_roles()
+{
+  info "[az_list_sp_roles|in] ($1)"
+
+  [ -z "$1" ] && err "no sp app display name provided" && exit 1
+  sp_app_name="$1"
+  az role assignment list --all --assignee "${sp_app_name}" --output json --query '[].{principalName:principalName, roleDefinitionName:roleDefinitionName, scope:scope}'
+
+  info "[az_list_sp_roles|out]"
+}
+
+az_storage_account_web_config(){
+  info "[az_storage_account_web_config|in] ($1, $2)"
+
+  [ -z "$1" ] && err "[az_storage_account_web_config] no STORAGE_ACCOUNT param provided" && exit 1
+  local STORAGE_ACCOUNT="$1"
+  [ -z "$2" ] && err "[az_storage_account_web_config] no resource group provided" && exit 1
+  local RESOURCE_GROUP="$2"
+
+  az storage blob service-properties update --account-name "$STORAGE_ACCOUNT" --static-website true \
+    --index-document "index.html" --404-document "404.html" #--debug --verbose 
+  result="$?"
+
+  if [ "$result" -eq "0" ]; then
+    cors_config=$(az storage cors list --account-name pvdi0textmining0website)
+    cors_result="$?"
+    info "[az_storage_account_web_config] cors_config result: $?"
+    info "[az_storage_account_web_config] cors_config: ->$cors_config<-"
+
+    if [[ "$cors_result" -eq "0" && "$cors_config" != "[]" ]]; then
+      warn "[az_storage_account_web_config] there is cors config already"
+    else
+      info "[az_storage_account_web_config] there is no cors config, goint to set it up"
+      az storage cors add --account-name "$STORAGE_ACCOUNT" --services b --methods GET --origins "*" --allowed-headers "*" --exposed-headers "*"
+      result="$?"
+    fi
+  fi
+
+  if [ "$result" -eq "0" ]; then
+    url=$(az storage account show --name "$STORAGE_ACCOUNT" --resource-group "$RESOURCE_GROUP" --query "primaryEndpoints.web" --output tsv) && \
+      add_entry_to_variables WEBSITE_URL "\"$url\""
+    result="$?"
+  fi
+
+  [ "$result" -ne "0" ] && err "[az_storage_account_web_config|out] could not configure bucket" && exit 1
+
+  info "[az_storage_account_web_config|out] => ${result}"
+}
+
+az_upload_static_website(){
+  info "[az_upload_static_website|in] ($1, $2)"
+
+  [ -z "$1" ] && err "[az_upload_static_website] no STORAGE_ACCOUNT param provided" && exit 1
+  local STORAGE_ACCOUNT="$1"
+  [ -z "$2" ] && err "[az_upload_static_website] no SOURCE_FOLDER param provided" && exit 1
+  local SOURCE_FOLDER="$2"
+
+  az storage blob upload-batch --account-name $STORAGE_ACCOUNT --source $SOURCE_FOLDER --destination '$web' --debug --verbose --overwrite
+
+  result="$?"
+  [ "$result" -ne "0" ] && err "[az_upload_static_website|out] could not configure bucket" && exit 1
+
+  info "[az_upload_static_website|out] => ${result}"
+}
+
+##########################################
+####### ------- databricks ------- #######
+##########################################
 
 databricks_bundle_deploy(){
   info "[databricks_bundle_deploy|in]"
@@ -692,6 +832,47 @@ databricks_bundle_destroy(){
   [ "$result" -ne "0" ] && err "[databricks_bundle_destroy|out]  => ${result}" && exit 1
   info "[databricks_bundle_destroy|out] => ${result}"
 }
+
+databricks_delete_secret(){
+  info "[databricks_delete_secret|in] ($1, $2)"
+
+  [ -z $1 ] && err "[databricks_delete_secret] missing argument SECRET_KEY" && exit 1
+  local SECRET_KEY="$1"
+  [ -z $2 ] && err "[databricks_delete_secret] missing argument SECRET_SCOPE" && exit 1
+  local SECRET_SCOPE="$2"
+
+  databricks secrets delete-secret $SECRET_SCOPE $SECRET_KEY
+  result="$?"
+
+  [ "$result" -ne "0" ] && err "[databricks_delete_secret|out] could not delete the secret" && exit 1
+  info "[databricks_delete_secret|out] => ${result}"
+}
+
+databricks_set_secret(){
+  info "[databricks_set_secret|in] ($1, $2, ${3:0:3})"
+
+  [ -z $1 ] && err "[databricks_set_secret] missing argument SECRET_KEY" && exit 1
+  local SECRET_KEY="$1"
+  [ -z $2 ] && err "[databricks_set_secret] missing argument SECRET_SCOPE" && exit 1
+  local SECRET_SCOPE="$2"
+  [ -z $3 ] && err "[databricks_set_secret] missing argument SECRET_VALUE" && exit 1
+  local SECRET_VALUE="$3"
+
+  query=$(databricks secrets get-secret $SECRET_SCOPE $SECRET_KEY)
+  if [ "$?" -ne "0" ]; then
+    info "[databricks_set_secret] creating secret $SECRET_KEY in scope $SECRET_SCOPE"
+    databricks secrets put-secret "$SECRET_SCOPE" "$SECRET_KEY" --string-value "$SECRET_VALUE"
+  else
+    warn "[databricks_set_secret] secret is already there"
+  fi
+  result="$?"
+  [ "$result" -ne "0" ] && err "[databricks_set_secret|out]  => ${result}" && exit 1
+  info "[databricks_set_secret|out] => ${result}"
+}
+
+##########################################
+#######  ------- commons -------   #######
+##########################################
 
 commands() {
   cat <<EOM
