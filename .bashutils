@@ -535,6 +535,11 @@ python_code_check()
     if [ ! -z "$1" ]; then
       src_folders="$1"
     fi
+
+    local src_folder="src"
+    if [ ! -z "$2" ]; then
+      src_folder="$2"
+    fi
     
     info "[python_code_check] ... isort..."
     isort --profile black -v $src_folders
@@ -558,6 +563,13 @@ python_code_check()
       pylint $src_folders
       return_value=$?
       info "[python_code_check] ... pylint...$return_value"
+    fi
+
+    if [ "$return_value" -eq "0" ]; then
+      info "[python_code_check] ... bandit..."
+      bandit -r $src_folder
+      return_value=$?
+      info "[python_code_check] ... bandit...$return_value"
     fi
    
     [ "$return_value" -ne "0" ] && exit 1
