@@ -552,6 +552,14 @@ python_code_check()
       return_value=$?
       info "[python_code_check] ... black...$return_value"
     fi
+
+    if [ "$return_value" -eq "0" ]; then
+      info "[python_code_check] ... pylint..."
+      pylint $src_folders
+      return_value=$?
+      info "[python_code_check] ... pylint...$return_value"
+    fi
+   
     [ "$return_value" -ne "0" ] && exit 1
     info "[python_code_check|out] => ${return_value}"
     return ${return_value}
