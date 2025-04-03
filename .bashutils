@@ -139,6 +139,35 @@ git_tag_and_push()
   info "[git_tag_and_push|out] => ${result}"
 }
 
+get_latest_tag() {
+    git fetch --tags > /dev/null 2>&1
+    latest_tag=$(git describe --tags --abbrev=0 2>/dev/null)
+    
+    if [ -z "$latest_tag" ]; then
+        echo "No tags found"
+        exit 1
+    else
+        echo "$latest_tag"
+    fi
+}
+
+changelog(){
+  info "[changelog|in] ($1)"
+
+  [ -z $1 ] && err "[changelog] missing argument FILE" && exit 1
+  local FILE="$1"
+
+  _pwd=`pwd`
+  cd "$this_folder"
+
+  git log --pretty=format:"%h %as %d %s" >> "$FILE"
+  result="$?"
+
+  cd "$_pwd"
+  [ "$result" -ne "0" ] && err "[changelog|out]  => ${result}" && exit 1
+  echo "[changelog|out] => $result"
+}
+
 ##########################################
 ####### ------- terraform -------  #######
 ##########################################
