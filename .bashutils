@@ -160,7 +160,7 @@ changelog(){
   _pwd=`pwd`
   cd "$this_folder"
 
-  git log --pretty=format:"%h %as %d %s" > "$FILE"
+  git log --pretty=format:"- %h %as %d %s" > "$FILE"
   result="$?"
 
   cd "$_pwd"
