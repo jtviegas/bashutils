@@ -154,8 +154,10 @@ get_latest_tag() {
 changelog(){
   info "[changelog|in] ($1)"
 
-  [ -z $1 ] && err "[changelog] missing argument FILE" && exit 1
-  local FILE="$1"
+  local FILE="CHANGELOG"
+  if [ ! -z $1 ]; then
+    FILE="$1"
+  fi
 
   _pwd=`pwd`
   cd "$this_folder"
