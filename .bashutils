@@ -696,6 +696,27 @@ python_hatch_publish(){
   echo "[python_hatch_publish] ...done."
 }
 
+build_cookiecutter_template(){
+  info "[build_cookiecutter_template|in] ($1)"
+  [[ -z "$1" ]] && err "[build_cookiecutter_template] must provide TEMPLATE_LOCATION folder" && exit 1
+  local TEMPLATE_LOCATION="$1"
+
+  [[ ! -d "$TEMPLATE_LOCATION" ]] && err "[build_cookiecutter_template] TEMPLATE_LOCATION folder not found" && exit 1
+  local TEMPLATE_NAME=$(basename "$TEMPLATE_LOCATION")
+  info "[build_cookiecutter_template|in] template name: $TEMPLATE_NAME"
+
+  _pwd=`pwd`
+  cd "$TEMPLATE_LOCATION/.."
+  local zipname="cookiecutter.zip"
+  local finalzipfile="$TEMPLATE_LOCATION/$zipname"
+  rm "$finalzipfile" 2>/dev/null
+  zip -r "$zipname" "$TEMPLATE_NAME" --quiet && mv $zipname $finalzipfile
+  result="$?"
+  cd "$_pwd"
+  [ "$result" -ne "0" ] && err "[build_cookiecutter_template|out]  => ${result}" && exit 1
+  info "[build_cookiecutter_template|out] => ${result}"
+}
+
 ##########################################
 #######   ------- azure -------    #######
 ##########################################
