@@ -717,6 +717,28 @@ build_cookiecutter_template(){
   info "[build_cookiecutter_template|out] => ${result}"
 }
 
+test_cookiecutter_template(){
+  info "[test_cookiecutter_template|in] ($1, $2)"
+
+  [[ -z "$1" ]] && err "[test_cookiecutter_template] must provide TEMPLATE_LOCATION folder" && exit 1
+  local TEMPLATE_LOCATION="$1"
+
+  local TEMPLATE_NAME=$(basename "$TEMPLATE_LOCATION")
+  info "[test_cookiecutter_template|in] template name: $TEMPLATE_NAME"
+
+  [[ -z "$2" ]] && err "[test_cookiecutter_template] must provide TEST_LOCATION folder" && exit 1
+  local TEST_LOCATION="$2"
+
+  _pwd=`pwd`
+  cd "$TEST_LOCATION" && pipx run cookiecutter --no-input "$TEMPLATE_LOCATION"
+  result="$?"
+  cd "$_pwd"
+  info "[test_cookiecutter_template] trying to open vscode on test project: $TEST_LOCATION/$TEMPLATE_NAME"
+  code "$TEST_LOCATION/$TEMPLATE_NAME" &
+  [ "$result" -ne "0" ] && err "[test_cookiecutter_template|out]  => ${result}" && exit 1
+  info "[test_cookiecutter_template|out] => ${result}"
+}
+
 ##########################################
 #######   ------- azure -------    #######
 ##########################################
