@@ -138,24 +138,21 @@ git_tag_and_push()
 }
 
 get_latest_tag() {
-    git fetch --tags > /dev/null 2>&1
-    latest_tag=$(git describe --tags --abbrev=0 2>/dev/null)
-    
-    if [ -z "$latest_tag" ]; then
-        echo "No tags found"
-        exit 1
-    else
-        echo "$latest_tag"
-    fi
+  info "[get_latest_tag|in]"
+  git fetch --tags > /dev/null 2>&1
+  latest_tag=$(git describe --tags --abbrev=0 2>/dev/null)
+  local result=0
+  if [ ! -z "$latest_tag" ]; then
+      result="$latest_tag"
+  fi
+  info "[get_latest_tag|out] => ${result}"
 }
 
 changelog(){
   info "[changelog|in] ($1)"
 
   local FILE="CHANGELOG"
-  if [ ! -z $1 ]; then
-    FILE="$1"
-  fi
+  [ ! -z $1 ] && FILE="$1"
   info "[changelog] creating file: $FILE"
 
   _pwd=`pwd`
@@ -740,6 +737,232 @@ test_cookiecutter_template(){
   code "$TEST_LOCATION/$TEMPLATE_NAME" &
   [ "$result" -ne "0" ] && err "[test_cookiecutter_template|out]  => ${result}" && exit 1
   info "[test_cookiecutter_template|out] => ${result}"
+}
+
+poetry_reqs(){
+  info "[poetry_reqs|in]"
+  _pwd=`pwd`
+  cd "$this_folder"
+
+  poetry run pre-commit install --install-hooks
+  poetry install --with dev
+  local result="$?"
+  if [ ! "$result" -eq "0" ] ; then err "[poetry_reqs] could not install dependencies"; fi
+
+  cd "$_pwd"
+
+  local msg="[poetry_reqs|out] => ${result}"
+  [[ ! "$result" -eq "0" ]] && info "$msg" && exit 1
+  info "$msg"
+}
+
+lint_check_ruff(){
+  info "[lint_check_ruff|in]"
+  _pwd=`pwd`
+
+  cd "$this_folder"
+
+  poetry run ruff check
+  local result="$?"
+  if [ ! "$result" -eq "0" ] ; then err "[lint_check_ruff] ruff linter check had issues"; fi
+
+  cd "$_pwd"
+
+  local msg="[lint_check_ruff|out] => ${result}"
+  [[ ! "$result" -eq "0" ]] && info "$msg" && exit 1
+  info "$msg"
+}
+
+poetry_pytest_unit(){
+  info "[poetry_pytest_unit|in] ($1)"
+
+  [[ -z "$1" ]] && err "[poetry_pytest_unit] must provide TEST_FOLDER" && exit 1
+  local TEST_FOLDER="$1"
+  local SRC_FOLDER="$this_folder/src"
+  [[ ! -z "$2" ]] && SRC_FOLDER="$2"
+
+
+  _pwd=`pwd`
+  cd "$this_folder"
+
+  poetry run pytest "$TEST_FOLDER" -x -s -vv --durations=0 \
+    --cov="$SRC_FOLDER" \
+    --cov-report=term-missing \
+    --cov-report=html \
+    --cov-report=xml \
+    --junitxml=unit-tests-results.xml
+  local result="$?"
+  [[ ! "$result" -eq "0" ]] && err "[poetry_pytest_unit] tests failed"
+
+  cd "$_pwd"
+
+  local msg="[poetry_pytest_unit|out] => ${result}"
+  [[ ! "$result" -eq "0" ]] && info "$msg" && exit 1
+  info "$msg"
+}
+
+poetry_pytest_bdd(){
+  info "[poetry_pytest_bdd|in] ($1)"
+
+  [[ -z "$1" ]] && err "[poetry_pytest_bdd] must provide TEST_FOLDER" && exit 1
+  local TEST_FOLDER="$1"
+  local SRC_FOLDER="$this_folder/src"
+  [[ ! -z "$2" ]] && SRC_FOLDER="$2"
+
+  _pwd=`pwd`
+  cd "$this_folder"
+  # Clear existing coverage and run BDD tests
+  poetry run coverage erase
+  poetry run pytest "$TEST_FOLDER" -x -s -vv --durations=0 \
+    --cov="$SRC_FOLDER" \
+    --cov-report=term-missing \
+    --cov-report=html \
+    --cov-report=xml \
+    --junitxml=bdd-tests-results.xml
+  local result="$?"
+  [[ ! "$result" -eq "0" ]] && err "[poetry_pytest_bdd] tests failed"
+
+  cd "$_pwd"
+
+  local msg="[poetry_pytest_bdd|out] => ${result}"
+  [[ ! "$result" -eq "0" ]] && info "$msg" && exit 1
+  info "$msg"
+}
+
+python_poetry_print_coverage()
+{
+  info "[python_poetry_print_coverage|in]"
+  
+  poetry run coverage report --show-missing
+  poetry run coverage html
+  poetry run coverage xml
+  result="$?"
+  [ "$result" -ne "0" ] && exit 1
+  info "[python_poetry_print_coverage|out] => $result"
+  return ${result}
+}
+
+python_poetry_check_coverage()
+{
+  info "[python_poetry_check_coverage|in] ($1)"
+  [ -z "$1" ] && usage
+
+  local threshold=$1
+  score=$(poetry run coverage report | awk '$1 == "TOTAL" {print $NF+0}')
+  result="$?"
+  [ "$result" -ne "0" ] && exit 1
+  if (( $threshold > $score )); then
+    err "[python_poetry_check_coverage] $score doesn't meet $threshold"
+    exit 1
+  fi
+  info "[python_poetry_check_coverage|out] => $score"
+}
+
+poetry_build(){
+  info "[poetry_build|in]"
+  _pwd=`pwd`
+  cd "$this_folder"
+  changelog
+  rm -rf dist/*
+  poetry build
+  local result="$?"
+  [[ ! "$result" -eq "0" ]] && err "[poetry_build] build failed"
+
+  cd "$_pwd"
+  local msg="[poetry_build|out] => ${result}"
+  [[ ! "$result" -eq "0" ]] && info "$msg" && exit 1
+  info "$msg"
+}
+
+poetry_publish_az(){
+  info "[poetry_publish_az|in]"
+
+  [ -z $1 ] && err "[poetry_publish_az] missing argument REPO_URL" && exit 1
+  local REPO_URL="$1"
+  [ -z $2 ] && err "[poetry_publish_az] missing argument REPO_NAME" && exit 1
+  local REPO_NAME="$2"
+  [ -z $3 ] && err "[poetry_publish_az] missing argument REPO_USER" && exit 1
+  local REPO_USER="$3"
+  [ -z $4 ] && err "[poetry_publish_az] missing argument REPO_PSWD" && exit 1
+  local REPO_PSWD="$4"
+  
+  _pwd=`pwd`
+  cd "$this_folder"
+
+  poetry config "repositories.${REPO_NAME}" "$REPO_URL"
+  poetry config "http-basic.${REPO_NAME}" "$REPO_USER" "$REPO_PSWD"
+  poetry publish -r "$REPO_NAME"
+  local result="$?"
+  [[ ! "$result" -eq "0" ]] && err "[poetry_publish_az] publish failed"
+
+  cd "$_pwd"
+  local msg="[poetry_publish_az|out] => ${result}"
+  [[ ! "$result" -eq "0" ]] && info "$msg" && exit 1
+  info "$msg"
+}
+
+poetry_add_supplemental_source_repo(){
+  info "[poetry_add_supplemental_source_repo|in]"
+  _pwd=`pwd`
+  cd "$this_folder"
+
+  [ -z $1 ] && err "[poetry_add_supplemental_source_repo] missing argument REPO_NAME" && exit 1
+  local REPO_NAME="$1"
+  [ -z $2 ] && err "[poetry_add_supplemental_source_repo] missing argument REPO_URL" && exit 1
+  local REPO_URL="$2"
+  [ -z $3 ] && err "[poetry_add_supplemental_source_repo] missing argument REPO_USR" && exit 1
+  local REPO_USR="$3"
+  [ -z $4 ] && err "[poetry_add_supplemental_source_repo] missing argument REPO_TOKEN" && exit 1
+  local REPO_TOKEN="$4"
+
+  poetry source add --priority=supplemental "$REPO_NAME" "$REPO_URL" && \
+    poetry config "http-basic.${REPO_NAME}" "$REPO_USR" "$REPO_TOKEN"
+  local result="$?"
+
+  cd "$_pwd"
+  local msg="[poetry_add_supplemental_source_repo|out] => ${result}"
+  [[ ! "$result" -eq "0" ]] && info "$msg" && exit 1
+  info "$msg"
+}
+
+sca_check_safety(){
+  info "[sca_check_safety|in] (${1:0:3})"
+  _pwd=`pwd`
+
+  [ -z $1 ] && err "[sca_check_safety] missing argument SAFETY_KEY" && exit 1
+  local SAFETY_KEY="$1"
+
+  cd "$this_folder"
+
+  poetry run safety check --key "$SAFETY_KEY" -i 51358 
+  local result="$?"
+  if [ ! "$result" -eq "0" ] ; then err "[sca_check_safety] code check had issues"; fi
+
+  cd "$_pwd"
+
+  local msg="[sca_check_safety|out] => ${result}"
+  [[ ! "$result" -eq "0" ]] && info "$msg" && exit 1
+  info "$msg"
+}
+
+sast_check_bandit(){
+  info "[sast_check_bandit|in] ($1)"
+  _pwd=`pwd`
+
+  [ -z $1 ] && err "[sast_check_bandit] missing argument SRC_DIR" && exit 1
+  local SRC_DIR="$1"
+
+  cd "$this_folder"
+
+  poetry run bandit -r $SRC_DIR
+  local result="$?"
+  if [ ! "$result" -eq "0" ] ; then err "[sast_check_bandit] code check had issues"; fi
+
+  cd "$_pwd"
+
+  local msg="[sast_check_bandit|out] => ${result}"
+  [[ ! "$result" -eq "0" ]] && info "$msg" && exit 1
+  info "$msg"
 }
 
 ##########################################
