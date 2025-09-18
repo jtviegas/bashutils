@@ -774,7 +774,7 @@ lint_check_ruff(){
 }
 
 poetry_pytest_unit(){
-  info "[poetry_pytest_unit|in] ($1)"
+  info "[poetry_pytest_unit|in] ($1, $2)"
 
   [[ -z "$1" ]] && err "[poetry_pytest_unit] must provide TEST_FOLDER" && exit 1
   local TEST_FOLDER="$1"
