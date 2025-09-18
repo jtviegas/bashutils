@@ -1018,6 +1018,27 @@ sast_check_bandit(){
   info "$msg"
 }
 
+poetry_publish_pip(){
+  info "[poetry_publish_pip|in] ($1, ${2:0:7})"
+
+  [ -z $1 ] && err "[poetry_publish_pip] missing argument PYPI_USER" && exit 1
+  local PYPI_USER="$1"
+  [ -z $2 ] && err "[poetry_publish_pip] missing argument PYPI_TOKEN" && exit 1
+  local PYPI_TOKEN="$2"
+  
+  _pwd=`pwd`
+  cd "$this_folder"
+
+  poetry publish -u "$PYPI_USER" -p "$PYPI_TOKEN"
+  local result="$?"
+  [[ ! "$result" -eq "0" ]] && err "[poetry_publish_pip] publish failed"
+
+  cd "$_pwd"
+  local msg="[poetry_publish_pip|out] => ${result}"
+  [[ ! "$result" -eq "0" ]] && info "$msg" && exit 1
+  info "$msg"
+}
+
 ##########################################
 #######   ------- azure -------    #######
 ##########################################
