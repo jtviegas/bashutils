@@ -934,7 +934,7 @@ sca_check_safety(){
 
   cd "$this_folder"
 
-  poetry run safety check --key "$SAFETY_KEY" -i 51358 
+  poetry run safety --key "$SAFETY_KEY" scan
   local result="$?"
   if [ ! "$result" -eq "0" ] ; then err "[sca_check_safety] code check had issues"; fi
 
