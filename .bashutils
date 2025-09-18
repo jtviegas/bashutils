@@ -744,8 +744,7 @@ poetry_reqs(){
   _pwd=`pwd`
   cd "$this_folder"
 
-  poetry run pre-commit install --install-hooks
-  poetry install --with dev
+  poetry install --with dev && poetry run pre-commit install --install-hooks
   local result="$?"
   if [ ! "$result" -eq "0" ] ; then err "[poetry_reqs] could not install dependencies"; fi
 
