@@ -166,6 +166,60 @@ changelog(){
   echo "[changelog|out] => $result"
 }
 
+proj_code_transfer(){
+  info "[proj_code_transfer|in] ($1)"
+
+  # example:
+  # export CODE_TRANSFER_FOLDERS="src tests"
+  # export CODE_TRANSFER_PATH_REPLACEMENT_ORIGIN="ssds_qsd_dataops"
+  # export CODE_TRANSFER_PATH_REPLACEMENT_TARGET="tgedr/dataops"
+
+  # export CODE_TRANSFER_IMPORT_REPLACEMENT_ORIGIN="ssds_qsd_dataops."
+  # export CODE_TRANSFER_IMPORT_REPLACEMENT_TARGET="tgedr.dataops."
+
+  [ -z $1 ] && err "[proj_code_transfer] missing argument TMP_FOLDER" && exit 1
+  local TMP_FOLDER="$1"
+  [ -z $2 ] && err "[proj_code_transfer] missing argument CODE_TRANSFER_FOLDERS" && exit 1
+  local CODE_TRANSFER_FOLDERS="$2"
+  [ -z $3 ] && err "[proj_code_transfer] missing argument CODE_TRANSFER_PATH_REPLACEMENT_ORIGIN" && exit 1
+  local CODE_TRANSFER_PATH_REPLACEMENT_ORIGIN="$3"
+  [ -z $4 ] && err "[proj_code_transfer] missing argument CODE_TRANSFER_PATH_REPLACEMENT_TARGET" && exit 1
+  local CODE_TRANSFER_PATH_REPLACEMENT_TARGET="$4"
+  [ -z $5 ] && err "[proj_code_transfer] missing argument CODE_TRANSFER_IMPORT_REPLACEMENT_ORIGIN" && exit 1
+  local CODE_TRANSFER_IMPORT_REPLACEMENT_ORIGIN="$5"
+  [ -z $6 ] && err "[proj_code_transfer] missing argument CODE_TRANSFER_IMPORT_REPLACEMENT_TARGET" && exit 1
+  local CODE_TRANSFER_IMPORT_REPLACEMENT_TARGET="$6"
+
+
+
+   _pwd=`pwd`
+  cd "$this_folder"
+
+  [[ ! -d "$TMP_FOLDER" ]] && mkdir -p "$TMP_FOLDER"
+
+  for item in "${CODE_TRANSFER_FOLDERS[@]}"; do
+    info "[proj_code_transfer] checking: $item"
+    find ./$item -type f | while read -r filepath; do
+
+    if [[ "$filepath" != *"__"* ]]; then
+        info "[proj_code_transfer] file: $filepath"
+        new_filepath=${filepath//$CODE_TRANSFER_PATH_REPLACEMENT_ORIGIN/$CODE_TRANSFER_PATH_REPLACEMENT_TARGET}
+        info "[proj_code_transfer] copying it to: $TMP_FOLDER/$new_filepath"
+        mkdir -p "$(dirname $TMP_FOLDER/$new_filepath)"
+        cp "$filepath" "$TMP_FOLDER/$new_filepath"
+        sed -i "" "s/import $CODE_TRANSFER_IMPORT_REPLACEMENT_ORIGIN/import $CODE_TRANSFER_IMPORT_REPLACEMENT_TARGET/g" "$TMP_FOLDER/$new_filepath"
+        sed -i "" "s/from $CODE_TRANSFER_IMPORT_REPLACEMENT_ORIGIN/from $CODE_TRANSFER_IMPORT_REPLACEMENT_TARGET/g" "$TMP_FOLDER/$new_filepath"
+    fi
+    done
+  done
+
+  local result="$?"
+  cd "$_pwd"
+  local msg="[proj_code_transfer|out] => ${result}"
+  [[ ! "$result" -eq "0" ]] && info "$msg" && exit 1
+  info "$msg"
+}
+
 ##########################################
 ####### ------- terraform -------  #######
 ##########################################
