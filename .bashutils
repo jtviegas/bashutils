@@ -2,12 +2,22 @@
 #######    ------- bash -------    #######
 ##########################################
 
+############################
+#   name: contains
+#   purpose: checks if a list contains a specific item
+#   parameters: $1 (list), $2 (item to find)
+############################
 # contains <list> <item>
 # echo $? # 0： match, 1: failed
 contains() {
     [[ $1 =~ (^|[[:space:]])$2($|[[:space:]]) ]] && return 0 || return 1
 }
 
+############################
+#   name: verify_prereqs
+#   purpose: verifies that required prerequisite commands are installed
+#   parameters: $@ (list of required commands)
+############################
 verify_prereqs(){
   info "[verify_prereqs] ..."
   for arg in "$@"
@@ -19,6 +29,11 @@ verify_prereqs(){
   info "[verify_prereqs] ...done."
 }
 
+############################
+#   name: verify_env
+#   purpose: verifies that required environment variables are defined
+#   parameters: $@ (list of environment variable names)
+############################
 verify_env(){
   info "[verify_env] ..."
   for arg in "$@"
@@ -29,6 +44,11 @@ verify_env(){
   info "[verify_env] ...done."
 }
 
+############################
+#   name: package
+#   purpose: creates a tar archive of specified files
+#   parameters: uses global vars TAR_NAME and INCLUDE_FILE
+############################
 package(){
   info "[package] ..."
   _pwd=`pwd`
@@ -41,6 +61,11 @@ package(){
   info "[package] ...done."
 }
 
+############################
+#   name: create_from_template_and_envvars
+#   purpose: creates a file from a template by substituting environment variables
+#   parameters: $1 (template file), $2 (destination file), $3+ (environment variable names)
+############################
 create_from_template_and_envvars() {
   info "[create_from_template_and_envvars] ...( $@ )"
   local usage_msg=$'create_from_template_and_envvars: creates a file from a template substituting env vars:\nusage:\n    create_from_template_and_envvars TEMPLATE DESTINATION [ENVVARS...]'
@@ -65,6 +90,11 @@ create_from_template_and_envvars() {
   info "[create_from_template_and_envvars] ...done."
 }
 
+############################
+#   name: add_entry_to_file
+#   purpose: adds or updates an environment variable entry in a file
+#   parameters: $1 (file name), $2 (variable name), $3 (variable value)
+############################
 add_entry_to_file()
 {
   info "[add_entry_to_file|in] ($1, $2, ${3:0:5})"
@@ -88,6 +118,11 @@ add_entry_to_file()
   info "[add_entry_to_file|out]"
 }
 
+############################
+#   name: add_entry_to_variables
+#   purpose: adds an environment variable entry to the variables file
+#   parameters: $1 (variable name), $2 (variable value)
+############################
 add_entry_to_variables()
 {
   info "[add_entry_to_variables|in] ($1, $2)"
@@ -99,6 +134,11 @@ add_entry_to_variables()
   info "[add_entry_to_variables|out]"
 }
 
+############################
+#   name: add_entry_to_local_variables
+#   purpose: adds an environment variable entry to the local variables file
+#   parameters: $1 (variable name), $2 (variable value)
+############################
 add_entry_to_local_variables()
 {
   info "[add_entry_to_local_variables|in] ($1, $2)"
@@ -110,6 +150,11 @@ add_entry_to_local_variables()
   info "[add_entry_to_local_variables|out]"
 }
 
+############################
+#   name: add_entry_to_secrets
+#   purpose: adds an environment variable entry to the secrets file
+#   parameters: $1 (variable name), $2 (variable value)
+############################
 add_entry_to_secrets()
 {
   info "[add_entry_to_secrets|in] ($1, ${2:0:7})"
@@ -121,6 +166,11 @@ add_entry_to_secrets()
   info "[add_entry_to_secrets|out]"
 }
 
+############################
+#   name: git_tag_and_push
+#   purpose: creates a git tag and pushes it to remote repository
+#   parameters: $1 (version), $2 (commit hash)
+############################
 git_tag_and_push()
 {
   info "[git_tag_and_push|in] ($1, ${2:0:7})"
@@ -137,6 +187,11 @@ git_tag_and_push()
   info "[git_tag_and_push|out] => ${result}"
 }
 
+############################
+#   name: get_latest_tag
+#   purpose: retrieves the latest git tag from the repository
+#   parameters: none
+############################
 get_latest_tag() {
   info "[get_latest_tag|in]"
   git fetch --tags > /dev/null 2>&1
@@ -147,6 +202,12 @@ get_latest_tag() {
   fi
   info "[get_latest_tag|out] => ${result}"
 }
+
+############################
+#   name: changelog
+#   purpose: creates a changelog file from git commit history
+#   parameters: $1 (optional filename, default: CHANGELOG)
+############################
 
 changelog(){
   info "[changelog|in] ($1)"
@@ -165,6 +226,12 @@ changelog(){
   [ "$result" -ne "0" ] && err "[changelog|out]  => ${result}" && exit 1
   echo "[changelog|out] => $result"
 }
+
+############################
+#   name: proj_code_transfer
+#   purpose: transfers code between projects with path and import replacements
+#   parameters: $1 (tmp folder), $2 (folders), $3 (origin path), $4 (target path), $5 (origin import), $6 (target import)
+############################
 
 proj_code_transfer(){
   info "[proj_code_transfer|in] ($1)"
@@ -224,6 +291,11 @@ proj_code_transfer(){
 ####### ------- terraform -------  #######
 ##########################################
 
+############################
+#   name: terraform_autodeploy
+#   purpose: automatically deploys terraform infrastructure
+#   parameters: $1 (terraform folder path)
+############################
 terraform_autodeploy(){
   info "[terraform_autodeploy] ..."
 
@@ -243,6 +315,12 @@ terraform_autodeploy(){
   cd "$_pwd"
   info "[terraform_autodeploy] ...done."
 }
+
+############################
+#   name: terraform_autodestroy
+#   purpose: automatically destroys terraform infrastructure
+#   parameters: $1 (terraform folder path)
+############################
 
 terraform_autodestroy(){
   info "[terraform_autodestroy] ..."
@@ -266,6 +344,11 @@ terraform_autodestroy(){
 #######     ------- js -------     #######
 ##########################################
 
+############################
+#   name: npm_deps
+#   purpose: installs npm dependencies in specified directory
+#   parameters: $1 (infrastructure directory)
+############################
 npm_deps(){
   info "[npm_deps|in] ($1)"
 
@@ -282,6 +365,12 @@ npm_deps(){
   [ "$result" -ne "0" ] && err "[npm_deps|out]  => ${result}" && exit 1
   info "[npm_deps|out] => ${result}"
 }
+
+############################
+#   name: npm_publish
+#   purpose: publishes npm package to registry
+#   parameters: $1 (registry), $2 (token), $3 (folder)
+############################
 
 npm_publish(){
   info "[npm_publish|in] ($1, $2)"
@@ -306,6 +395,11 @@ npm_publish(){
 #######     ------- aws -------    #######
 ##########################################
 
+############################
+#   name: aws_find_kms_alias
+#   purpose: finds AWS KMS alias by name
+#   parameters: $1 (alias name)
+############################
 aws_find_kms_alias(){
   echo "[aws_find_kms_alias|in] ($1)"
 
@@ -323,6 +417,12 @@ aws_find_kms_alias(){
   return ${result}
 }
 
+############################
+#   name: aws_get_cloudfront_cidr
+#   purpose: retrieves CloudFront CIDR blocks and saves to file
+#   parameters: $1 (output file)
+############################
+
 aws_get_cloudfront_cidr(){
   info "[aws_get_cloudfront_cidr|in] ($1)"
 
@@ -337,6 +437,12 @@ aws_get_cloudfront_cidr(){
   [ "$result" -ne "0" ] && err "[aws_get_cloudfront_cidr|out]  => ${result}" && exit 1
   info "[aws_get_cloudfront_cidr|out] => ${result}"
 }
+
+############################
+#   name: aws_set_profile
+#   purpose: configures AWS CLI profile with credentials
+#   parameters: $1 (profile), $2 (key), $3 (secret), $4 (region), $5 (optional output format)
+############################
 
 aws_set_profile(){
   info "[aws_set_profile|in] ($1, $2, ${3:0:5}, $4, $5)"
@@ -371,6 +477,11 @@ aws_set_profile(){
 #######     ------- cdk -------    #######
 ##########################################
 
+############################
+#   name: cdk_global_reqs
+#   purpose: installs global CDK requirements
+#   parameters: $1 (typescript version), $2 (cdk version), $3 (ts-node version), $4 (integ runner version), $5 (integ tests version), $6 (jest version)
+############################
 cdk_global_reqs(){
   info "[cdk_global_reqs|in] ($1, $2, $3, $4, $5, $6)"
 
@@ -395,6 +506,12 @@ cdk_global_reqs(){
   info "[cdk_global_reqs|out] => ${result}"
 }
 
+############################
+#   name: cdk_scaffolding
+#   purpose: creates CDK project scaffolding
+#   parameters: $1 (infrastructure directory)
+############################
+
 cdk_scaffolding(){
   info "[cdk_scaffolding|in] ($1)"
 
@@ -411,6 +528,12 @@ cdk_scaffolding(){
   [ "$result" -ne "0" ] && err "[cdk_scaffolding|out]  => ${result}" && exit 1
   info "[cdk_scaffolding|out] => ${result}"
 }
+
+############################
+#   name: cdk_infra_bootstrap
+#   purpose: bootstraps CDK infrastructure with dependencies
+#   parameters: $1-6 (various version parameters), $7 (infrastructure directory)
+############################
 
 cdk_infra_bootstrap(){
   info "[cdk_infra_bootstrap|in] ($1, $2, $3, $4, $5, $6)"
@@ -437,6 +560,12 @@ cdk_infra_bootstrap(){
   [ "$result" -ne "0" ] && err "[cdk_infra_bootstrap|out]  => ${result}" && exit 1
   info "[cdk_infra_bootstrap|out] => ${result}"
 }
+
+############################
+#   name: cdk_infra
+#   purpose: manages CDK infrastructure deployment/destruction
+#   parameters: $1 (operation: on/off/bootstrap), $2 (optional infra folder), $3 (optional stacks)
+############################
 
 cdk_infra()
 {
@@ -485,6 +614,12 @@ cdk_infra()
   info "[cdk_infra|out]"
 }
 
+############################
+#   name: cdk_setup
+#   purpose: sets up CDK project dependencies
+#   parameters: $1 (optional infrastructure directory)
+############################
+
 cdk_setup()
 {
     info "[cdk_setup|in] ($1)"
@@ -509,6 +644,11 @@ cdk_setup()
 #######   ------- python -------   #######
 ##########################################
 
+############################
+#   name: python_add_pip_index_to_requirements
+#   purpose: adds extra pip index URL to requirements file
+#   parameters: $1 (extra index URL), $2 (requirements file)
+############################
 python_add_pip_index_to_requirements(){
   info "[python_add_pip_index_to_requirements|in] ($1, $2)"
 
@@ -527,6 +667,12 @@ python_add_pip_index_to_requirements(){
   info "[python_add_pip_index_to_requirements|out] => ${result}"
 }
 
+############################
+#   name: python_build
+#   purpose: builds Python package using python -m build
+#   parameters: none (uses global this_folder)
+############################
+
 python_build(){
   info "[python_build] ..."
 
@@ -540,6 +686,12 @@ python_build(){
   cd "$_pwd"
   echo "[python_build] ...done."
 }
+
+############################
+#   name: python_pypi_publish
+#   purpose: publishes Python package to PyPI
+#   parameters: $1 (username), $2 (token)
+############################
 
 python_pypi_publish(){
   info "[python_pypi_publish|in] ($1, ${2:0:7})"
@@ -558,6 +710,12 @@ python_pypi_publish(){
   cd "$_pwd"
   echo "[python_pypi_publish|out]"
 }
+
+############################
+#   name: python_twine_publish
+#   purpose: publishes Python package using twine
+#   parameters: $1 (username), $2 (password), $3 (optional repository URL)
+############################
 
 python_twine_publish(){
   info "[python_twine_publish|in] ($1, ${2:0:5}, $3)"
@@ -581,6 +739,12 @@ python_twine_publish(){
   [ "$result" -ne "0" ] && err "[python_twine_publish|out]  => ${result}" && exit 1
   info "[python_twine_publish|out] => ${result}"
 }
+
+############################
+#   name: python_code_lint
+#   purpose: runs code linting tools (isort, autoflake, black)
+#   parameters: $1 (optional source folders, default: 'src test')
+############################
 
 python_code_lint()
 {
@@ -611,6 +775,12 @@ python_code_lint()
     info "[python_code_lint|out] => ${return_value}"
     return ${return_value}
 }
+
+############################
+#   name: python_code_check
+#   purpose: runs code quality checks (isort, autoflake, black, pylint, bandit)
+#   parameters: $1 (optional source folders), $2 (optional src folder for bandit)
+############################
 
 python_code_check()
 {
@@ -662,6 +832,12 @@ python_code_check()
     return ${return_value}
 }
 
+############################
+#   name: python_print_coverage
+#   purpose: prints test coverage report
+#   parameters: none
+############################
+
 python_print_coverage()
 {
   info "[python_print_coverage|in]"
@@ -671,6 +847,12 @@ python_print_coverage()
   info "[python_print_coverage|out] => $result"
   return ${result}
 }
+
+############################
+#   name: python_check_coverage
+#   purpose: checks if coverage meets minimum threshold
+#   parameters: $1 (coverage threshold percentage)
+############################
 
 python_check_coverage()
 {
@@ -689,6 +871,12 @@ python_check_coverage()
   info "[python_check_coverage|out] => $score"
 }
 
+############################
+#   name: python_test
+#   purpose: runs Python tests with pytest and coverage
+#   parameters: $1 (optional test path)
+############################
+
 python_test()
 {
     info "[python_test|in] ($1)"
@@ -698,6 +886,12 @@ python_test()
     info "[python_test|out] => ${return_value}"
     return ${return_value}
 }
+
+############################
+#   name: python_reqs
+#   purpose: installs Python requirements from file
+#   parameters: $1 (optional requirements file, default: requirements.txt)
+############################
 
 python_reqs()
 {
@@ -712,6 +906,12 @@ python_reqs()
     [ "$?" -ne "0" ] && exit 1
     info "[python_reqs|out]"
 }
+
+############################
+#   name: python_hatch_build
+#   purpose: builds Python package using hatch
+#   parameters: $1 (optional root directory)
+############################
 
 python_hatch_build(){
   echo "[python_hatch_build] ($1)..."
@@ -732,6 +932,12 @@ python_hatch_build(){
   echo "[python_hatch_build] ...done."
 }
 
+############################
+#   name: python_hatch_publish
+#   purpose: publishes Python package using hatch
+#   parameters: $1 (optional root directory)
+############################
+
 python_hatch_publish(){
   echo "[python_hatch_publish] ($1)..."
 
@@ -749,6 +955,12 @@ python_hatch_publish(){
   cd "$_pwd"
   echo "[python_hatch_publish] ...done."
 }
+
+############################
+#   name: build_cookiecutter_template
+#   purpose: builds a cookiecutter template as zip archive
+#   parameters: $1 (template location folder)
+############################
 
 build_cookiecutter_template(){
   info "[build_cookiecutter_template|in] ($1)"
@@ -770,6 +982,12 @@ build_cookiecutter_template(){
   [ "$result" -ne "0" ] && err "[build_cookiecutter_template|out]  => ${result}" && exit 1
   info "[build_cookiecutter_template|out] => ${result}"
 }
+
+############################
+#   name: test_cookiecutter_template
+#   purpose: tests a cookiecutter template by creating instance
+#   parameters: $1 (template location), $2 (test location)
+############################
 
 test_cookiecutter_template(){
   info "[test_cookiecutter_template|in] ($1, $2)"
@@ -793,6 +1011,12 @@ test_cookiecutter_template(){
   info "[test_cookiecutter_template|out] => ${result}"
 }
 
+############################
+#   name: poetry_reqs
+#   purpose: installs poetry dependencies and pre-commit hooks
+#   parameters: none (uses global this_folder)
+############################
+
 poetry_reqs(){
   info "[poetry_reqs|in]"
   _pwd=`pwd`
@@ -808,6 +1032,12 @@ poetry_reqs(){
   [[ ! "$result" -eq "0" ]] && info "$msg" && exit 1
   info "$msg"
 }
+
+############################
+#   name: lint_check_ruff
+#   purpose: runs ruff linter check on code
+#   parameters: none (uses global this_folder)
+############################
 
 lint_check_ruff(){
   info "[lint_check_ruff|in]"
@@ -825,6 +1055,12 @@ lint_check_ruff(){
   [[ ! "$result" -eq "0" ]] && info "$msg" && exit 1
   info "$msg"
 }
+
+############################
+#   name: poetry_pytest_unit
+#   purpose: runs unit tests using poetry and pytest with coverage
+#   parameters: $1 (test folder), $2 (optional src folder)
+############################
 
 poetry_pytest_unit(){
   info "[poetry_pytest_unit|in] ($1, $2)"
@@ -854,6 +1090,12 @@ poetry_pytest_unit(){
   info "$msg"
 }
 
+############################
+#   name: poetry_pytest_bdd
+#   purpose: runs BDD tests using poetry and pytest with coverage
+#   parameters: $1 (test folder), $2 (optional src folder)
+############################
+
 poetry_pytest_bdd(){
   info "[poetry_pytest_bdd|in] ($1)"
 
@@ -882,6 +1124,12 @@ poetry_pytest_bdd(){
   info "$msg"
 }
 
+############################
+#   name: python_poetry_print_coverage
+#   purpose: prints coverage report using poetry
+#   parameters: none
+############################
+
 python_poetry_print_coverage()
 {
   info "[python_poetry_print_coverage|in]"
@@ -894,6 +1142,12 @@ python_poetry_print_coverage()
   info "[python_poetry_print_coverage|out] => $result"
   return ${result}
 }
+
+############################
+#   name: python_poetry_check_coverage
+#   purpose: checks coverage threshold using poetry
+#   parameters: $1 (coverage threshold percentage)
+############################
 
 python_poetry_check_coverage()
 {
@@ -911,6 +1165,12 @@ python_poetry_check_coverage()
   info "[python_poetry_check_coverage|out] => $score"
 }
 
+############################
+#   name: poetry_build
+#   purpose: builds project using poetry and creates changelog
+#   parameters: none (uses global this_folder)
+############################
+
 poetry_build(){
   info "[poetry_build|in]"
   _pwd=`pwd`
@@ -926,6 +1186,12 @@ poetry_build(){
   [[ ! "$result" -eq "0" ]] && info "$msg" && exit 1
   info "$msg"
 }
+
+############################
+#   name: poetry_publish_az
+#   purpose: publishes package to Azure DevOps using poetry
+#   parameters: $1 (repo URL), $2 (repo name), $3 (username), $4 (password)
+############################
 
 poetry_publish_az(){
   info "[poetry_publish_az|in]"
@@ -954,6 +1220,12 @@ poetry_publish_az(){
   info "$msg"
 }
 
+############################
+#   name: poetry_add_supplemental_source_repo
+#   purpose: adds supplemental package repository to poetry config
+#   parameters: $1 (repo name), $2 (repo URL), $3 (username), $4 (token)
+############################
+
 poetry_add_supplemental_source_repo(){
   info "[poetry_add_supplemental_source_repo|in]"
   _pwd=`pwd`
@@ -978,6 +1250,12 @@ poetry_add_supplemental_source_repo(){
   info "$msg"
 }
 
+############################
+#   name: sca_check_safety
+#   purpose: runs safety check for security vulnerabilities
+#   parameters: $1 (safety API key)
+############################
+
 sca_check_safety(){
   info "[sca_check_safety|in] (${1:0:3})"
   _pwd=`pwd`
@@ -998,6 +1276,12 @@ sca_check_safety(){
   info "$msg"
 }
 
+############################
+#   name: sast_check_bandit
+#   purpose: runs bandit SAST security check
+#   parameters: $1 (source directory)
+############################
+
 sast_check_bandit(){
   info "[sast_check_bandit|in] ($1)"
   _pwd=`pwd`
@@ -1017,6 +1301,12 @@ sast_check_bandit(){
   [[ ! "$result" -eq "0" ]] && info "$msg" && exit 1
   info "$msg"
 }
+
+############################
+#   name: poetry_publish_pip
+#   purpose: publishes package to PyPI using poetry
+#   parameters: $1 (PyPI username), $2 (PyPI token)
+############################
 
 poetry_publish_pip(){
   info "[poetry_publish_pip|in] ($1, ${2:0:7})"
@@ -1043,12 +1333,23 @@ poetry_publish_pip(){
 #######   ------- azure -------    #######
 ##########################################
 
+############################
+#   name: az_sp_assign_subscription
+#   purpose: assigns service principal to Azure subscription
+#   parameters: uses env vars APP_ID and ARM_SUBSCRIPTION_ID
+############################
 az_sp_assign_subscription()
 {
   info "[az_sp_assign_subscription|in]"
   az role assignment create --assignee "${APP_ID}" --role "Contributor" --scope "/subscriptions/${ARM_SUBSCRIPTION_ID}"
   info "[az_sp_assign_subscription|out]"
 }
+
+############################
+#   name: az_sp_login
+#   purpose: logs in using Azure service principal
+#   parameters: uses env vars APP_ID, ARM_CLIENT_SECRET, ARM_TENANT_ID
+############################
 
 az_sp_login()
 {
@@ -1057,6 +1358,12 @@ az_sp_login()
   info "[az_sp_login|out]"
 }
 
+############################
+#   name: az_login_check
+#   purpose: checks Azure login status by listing VM sizes
+#   parameters: none
+############################
+
 az_login_check()
 {
   info "[az_login_check|in]"
@@ -1064,12 +1371,24 @@ az_login_check()
   info "[az_login_check|out]"
 }
 
+############################
+#   name: az_logout
+#   purpose: logs out from Azure CLI
+#   parameters: none
+############################
+
 az_logout()
 {
   info "[az_logout|in]"
   az logout
   info "[az_logout|out]"
 }
+
+############################
+#   name: az_list_sp_roles
+#   purpose: lists roles assigned to service principal
+#   parameters: $1 (service principal app display name)
+############################
 
 az_list_sp_roles()
 {
@@ -1081,6 +1400,12 @@ az_list_sp_roles()
 
   info "[az_list_sp_roles|out]"
 }
+
+############################
+#   name: az_storage_account_web_config
+#   purpose: configures Azure storage account for static website hosting
+#   parameters: $1 (storage account name), $2 (resource group)
+############################
 
 az_storage_account_web_config(){
   info "[az_storage_account_web_config|in] ($1, $2)"
@@ -1120,6 +1445,12 @@ az_storage_account_web_config(){
   info "[az_storage_account_web_config|out] => ${result}"
 }
 
+############################
+#   name: az_upload_static_website
+#   purpose: uploads static website files to Azure storage
+#   parameters: $1 (storage account), $2 (source folder)
+############################
+
 az_upload_static_website(){
   info "[az_upload_static_website|in] ($1, $2)"
 
@@ -1135,6 +1466,12 @@ az_upload_static_website(){
 
   info "[az_upload_static_website|out] => ${result}"
 }
+
+############################
+#   name: get_azure_access_token
+#   purpose: obtains Azure access token using client credentials
+#   parameters: $1 (tenant ID), $2 (client ID), $3 (client secret), $4 (scope)
+############################
 
 get_azure_access_token(){
   info "[get_azure_access_token|in] ($1, $2, ${3:0:3}, $4)"
@@ -1168,8 +1505,13 @@ get_azure_access_token(){
 ####### ------- databricks ------- #######
 ##########################################
 
+############################
+#   name: databricks_set_cli_access
+#   purpose: configures Databricks CLI access using Azure login
+#   parameters: $1 (workspace URL), $2 (subscription ID)
+############################
 databricks_set_cli_access()
-{ 
+{
   info "[databricks_set_cli_access|in] ($1, $2)"
   [ -z "$2" ] && err "no subscription Id provided" && return 1
   [ -z "$1" ] && err "no workspace url provided" && return 1
@@ -1183,6 +1525,12 @@ databricks_set_cli_access()
   add_entry_to_secrets DATABRICKS_TOKEN "$token"
   info "[databricks_set_cli_access|out]"
 }
+
+############################
+#   name: databricks_bundle_deploy
+#   purpose: deploys Databricks bundle to specified target
+#   parameters: $1 (bundle folder), $2 (optional target, default: local)
+############################
 
 databricks_bundle_deploy(){
   info "[databricks_bundle_deploy|in]"
@@ -1207,6 +1555,12 @@ databricks_bundle_deploy(){
   info "[databricks_bundle_deploy|out] => ${result}"
 }
 
+############################
+#   name: databricks_bundle_destroy
+#   purpose: destroys Databricks bundle from specified target
+#   parameters: $1 (bundle folder), $2 (optional target, default: local)
+############################
+
 databricks_bundle_destroy(){
   info "[databricks_bundle_destroy|in]"
 
@@ -1229,6 +1583,12 @@ databricks_bundle_destroy(){
   info "[databricks_bundle_destroy|out] => ${result}"
 }
 
+############################
+#   name: databricks_delete_secret
+#   purpose: deletes secret from Databricks secret scope
+#   parameters: $1 (secret key), $2 (secret scope)
+############################
+
 databricks_delete_secret(){
   info "[databricks_delete_secret|in] ($1, $2)"
 
@@ -1243,6 +1603,12 @@ databricks_delete_secret(){
   [ "$result" -ne "0" ] && err "[databricks_delete_secret|out] could not delete the secret" && exit 1
   info "[databricks_delete_secret|out] => ${result}"
 }
+
+############################
+#   name: databricks_set_secret
+#   purpose: sets secret in Databricks secret scope
+#   parameters: $1 (secret key), $2 (secret scope), $3 (secret value)
+############################
 
 databricks_set_secret(){
   info "[databricks_set_secret|in] ($1, $2, ${3:0:3})"
@@ -1266,10 +1632,17 @@ databricks_set_secret(){
   info "[databricks_set_secret|out] => ${result}"
 }
 
+
+
 ##########################################
 #######  ------- assorted -------  #######
 ##########################################
 
+############################
+#   name: test_js_lambda
+#   purpose: tests JavaScript Lambda function with Jest
+#   parameters: $1 (function directory)
+############################
 test_js_lambda(){
   info "[test_js_lambda|in] ({$1})"
 
@@ -1286,6 +1659,12 @@ test_js_lambda(){
   [ "$result" -ne "0" ] && err "[test_js_lambda|out]  => ${result}" && exit 1
   info "[test_js_lambda|out] => ${result}"
 }
+
+############################
+#   name: zip_js_lambda_function
+#   purpose: creates zip archive of JavaScript Lambda function
+#   parameters: $1 (source dir), $2 (zip file), $3+ (files/folders to include)
+############################
 
 zip_js_lambda_function(){
   info "[zip_js_lambda_function] ...( $@ )"
@@ -1318,6 +1697,12 @@ zip_js_lambda_function(){
   info "[zip_js_lambda_function] ...done."
 }
 
+############################
+#   name: get_function_release
+#   purpose: downloads function release artifact from GitHub
+#   parameters: $1 (repository), $2 (artifact name)
+############################
+
 get_function_release(){
   info "[get_function_release] ...( $@ )"
   local usage_msg=$'get_function_release: retrieves a function release artifact from github:\nusage:\n    get_function_release REPO ARTIFACT'
@@ -1337,6 +1722,12 @@ get_function_release(){
   info "[get_function_release] ...done."
 }
 
+############################
+#   name: download_function
+#   purpose: downloads function from GitHub releases to specific file
+#   parameters: $1 (repository), $2 (artifact), $3 (destination file)
+############################
+
 download_function(){
   info "[download_function|in] ...( $@ )"
   local usage_msg=$'download_function: downloads a function release artifact from github:\nusage:\n    download_function REPO ARTIFACT DESTINATION_FILE'
@@ -1353,6 +1744,12 @@ download_function(){
 
   info "[download_function|out] ...done."
 }
+
+############################
+#   name: call_grafana_api
+#   purpose: makes authenticated call to Grafana API via Bifrost
+#   parameters: $1 (Azure access token), $2 (Grafana API token)
+############################
 
 call_grafana_api(){
   info "[call_grafana_api|in] (${1:0:3}, ${2:0:3})"
@@ -1375,6 +1772,11 @@ call_grafana_api(){
 #######  ------- commons -------   #######
 ##########################################
 
+############################
+#   name: commands
+#   purpose: displays helpful command reference information
+#   parameters: none
+############################
 commands() {
   cat <<EOM
 
