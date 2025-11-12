@@ -287,6 +287,31 @@ proj_code_transfer(){
   info "$msg"
 }
 
+############################
+#   name: add_pypi_config
+#   purpose: adds PyPI configuration file with provided token
+#   parameters: $1 (PyPI token)
+############################
+
+add_pypi_config(){
+  info "[add_pypi_config] ..."
+
+  [ -z $1 ] && err "[add_pypi_config] missing argument PYPI_TOKEN" && exit 1
+  local PYPI_TOKEN="$1"
+  
+  _pwd=`pwd`
+  cd ~/
+
+  if [ ! -f ".pypirc" ]; then
+    info "[add_pypi_config] no '.pypirc' going to create it"
+    echo "[pypi]" > .pypirc
+    echo "username = __token__" >> .pypirc
+    echo "password = $PYPI_TOKEN" >> .pypirc
+  fi
+  cd "$_pwd"
+  info "[add_pypi_config] ...done."
+}
+
 ##########################################
 ####### ------- terraform -------  #######
 ##########################################
@@ -1632,6 +1657,35 @@ databricks_set_secret(){
   info "[databricks_set_secret|out] => ${result}"
 }
 
+
+############################
+#   name: get_azure_artifact
+#   purpose: downloads universal artifact from Azure DevOps artifacts feed
+#   parameters: $1 (organization), $2 (feed), $3 (name), $4 (version), $5 (optional target path)
+############################
+
+get_azure_artifact(){
+  info "[get_azure_artifact|in] ($1, $2, $3, $4, $5)"
+
+  [ -z "$1" ] && err "[get_azure_artifact] missing argument ORGANIZATION" && exit 1
+  local ORGANIZATION="$1"
+  [ -z "$2" ] && err "[get_azure_artifact] missing argument FEED" && exit 1
+  local FEED="$2"
+  [ -z "$3" ] && err "[get_azure_artifact] missing argument NAME" && exit 1
+  local NAME="$3"
+  [ -z "$4" ] && err "[get_azure_artifact] missing argument VERSION" && exit 1
+  local VERSION="$4"
+
+  local TARGET="."
+  [ ! -z "$5" ] && TARGET="$5"
+  [ ! -d "$TARGET" ] && mkdir -p "$TARGET"
+
+  az artifacts universal download --organization "$ORGANIZATION" --feed "$FEED" --name "$NAME" --version "$VERSION" --path "$TARGET"
+  result="$?"
+
+  [ "$result" -ne "0" ] && err "[get_azure_artifact|out] => ${result}" && exit 1
+  info "[get_azure_artifact|out] => ${result}"
+}
 
 
 ##########################################
