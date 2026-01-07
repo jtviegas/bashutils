@@ -326,7 +326,32 @@ assert_uv_config(){
     [ "$?" -ne "0" ] && err "[assert_uv_config|out] failed" && exit 1
   fi
 
+  _pwd=`pwd`
+  cd "$this_folder"
+  uv sync
+  result="$?"
+  cd "$_pwd"
+  
+  [ "$result" -ne "0" ] && err "[assert_uv_config|out]  => ${result}" && exit 1
   info "[assert_uv_config|out]"
+}
+
+changelog(){
+  info "[changelog|in] ($1)"
+
+  local FILE="CHANGELOG"
+  [ ! -z $1 ] && FILE="$1"
+  info "[changelog] creating file: $FILE"
+
+  _pwd=`pwd`
+  cd "$this_folder"
+
+  git log --pretty=format:"- %h %as %d %s" > "$FILE"
+  result="$?"
+
+  cd "$_pwd"
+  [ "$result" -ne "0" ] && err "[changelog|out]  => ${result}" && exit 1
+  echo "[changelog|out] => $result"
 }
 
 ##########################################
