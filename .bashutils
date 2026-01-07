@@ -312,6 +312,23 @@ add_pypi_config(){
   info "[add_pypi_config] ...done."
 }
 
+############################
+#   name: assert_uv_config
+#   purpose: assures that last version of 'uv' is present in the system
+############################
+
+assert_uv_config(){
+  info "[assert_uv_config|out]"
+
+  which uv 1>/dev/null
+  if [ "$?" -ne "0" ]; then 
+    curl -LsSf https://astral.sh/uv/install.sh | sh
+    [ "$?" -ne "0" ] && err "[assert_uv_config|out] failed" && exit 1
+  fi
+
+  info "[assert_uv_config|out]"
+}
+
 ##########################################
 ####### ------- terraform -------  #######
 ##########################################
