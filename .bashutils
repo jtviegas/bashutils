@@ -328,8 +328,15 @@ assert_uv_config(){
 
   _pwd=`pwd`
   cd "$this_folder"
-  uv sync
-  result="$?"
+  if [ ! -f "$this_folder/pyproject.toml" ]; then
+    uv init
+    result="$?"
+    [ "$result" -ne "0" ] && err "[assert_uv_config|out] failed to 'uv init'"
+  else
+    uv sync
+    result="$?"
+    [ "$result" -ne "0" ] && err "[assert_uv_config|out] failed to 'uv sync'"
+  fi
   cd "$_pwd"
   
   [ "$result" -ne "0" ] && err "[assert_uv_config|out]  => ${result}" && exit 1
