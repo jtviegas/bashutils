@@ -318,7 +318,7 @@ add_pypi_config(){
 ############################
 
 assert_uv_config(){
-  info "[assert_uv_config|out]"
+  info "[assert_uv_config|in]"
 
   which uv 1>/dev/null
   if [ "$?" -ne "0" ]; then 
