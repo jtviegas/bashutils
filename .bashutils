@@ -338,27 +338,23 @@ assert_uv_config(){
     [ "$result" -ne "0" ] && err "[assert_uv_config|out] failed to 'uv sync'"
   fi
   cd "$_pwd"
-  
+
   [ "$result" -ne "0" ] && err "[assert_uv_config|out]  => ${result}" && exit 1
   info "[assert_uv_config|out]"
 }
 
-changelog(){
-  info "[changelog|in] ($1)"
+############################
+#   name: print_uuid
+#   purpose: prints a generated UUID
+############################
 
-  local FILE="CHANGELOG"
-  [ ! -z $1 ] && FILE="$1"
-  info "[changelog] creating file: $FILE"
+print_uuid(){
+  info "[print_uuid|in] ($1)"
 
-  _pwd=`pwd`
-  cd "$this_folder"
+  UUID=$(uuidgen)
+  echo "generated UUID => $UUID"
 
-  git log --pretty=format:"- %h %as %d %s" > "$FILE"
-  result="$?"
-
-  cd "$_pwd"
-  [ "$result" -ne "0" ] && err "[changelog|out]  => ${result}" && exit 1
-  echo "[changelog|out] => $result"
+  echo "[print_uuid|out]"
 }
 
 ##########################################
