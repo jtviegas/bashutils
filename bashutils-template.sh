@@ -52,17 +52,25 @@ download_bashutils_if_newer() {
   fi
 
   if [ ! -f "$bashutils" ]; then
-    curl -fsSL -R "$BASHUTILS_URL" -o "$bashutils_tmp"
+    if ! curl -fsSL -R "$BASHUTILS_URL" -o "$bashutils_tmp"; then
+      err "[download_bashutils_if_newer] failed to download $INCLUDE_FILE"
+      rm -f "$bashutils_tmp"
+      return 1
+    fi
   else
-    curl -fsSL -R -z "$bashutils" "$BASHUTILS_URL" -o "$bashutils_tmp"
+    if ! curl -fsSL -R -z "$bashutils" "$BASHUTILS_URL" -o "$bashutils_tmp"; then
+      err "[download_bashutils_if_newer] failed to download $INCLUDE_FILE"
+      rm -f "$bashutils_tmp"
+      return 1
+    fi
   fi
-  result="$?"
-  [ "$result" -ne "0" ] && err "[download_bashutils_if_newer] failed to download $INCLUDE_FILE" && rm -f "$bashutils_tmp" && return 1
 
   if [ -s "$bashutils_tmp" ]; then
-    mv "$bashutils_tmp" "$bashutils"
-    result="$?"
-    [ "$result" -ne "0" ] && err "[download_bashutils_if_newer] failed to replace $INCLUDE_FILE" && rm -f "$bashutils_tmp" && return 1
+    if ! mv "$bashutils_tmp" "$bashutils"; then
+      err "[download_bashutils_if_newer] failed to replace $INCLUDE_FILE"
+      rm -f "$bashutils_tmp"
+      return 1
+    fi
     info "[download_bashutils_if_newer] updated $INCLUDE_FILE"
   else
     rm -f "$bashutils_tmp"
@@ -92,7 +100,7 @@ download_bashutils_if_newer || exit 1
 
 hello_world(){
   info "[hello_world|in]"
-  _pwd=`pwd`
+  _pwd=$(pwd)
   cd "$this_folder"
 
   echo "hello world"
