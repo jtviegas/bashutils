@@ -14,22 +14,22 @@ fi
 # --- required functions
 debug(){
     local __msg="$1"
-    echo " [DEBUG] `date` ... $__msg "
+    echo " [DEBUG] $(date) ... $__msg "
 }
 
 info(){
     local __msg="$1"
-    echo " [INFO]  `date` ->>> $__msg "
+    echo " [INFO]  $(date) ->>> $__msg "
 }
 
 warn(){
     local __msg="$1"
-    echo " [WARN]  `date` *** $__msg "
+    echo " [WARN]  $(date) *** $__msg "
 }
 
 err(){
     local __msg="$1"
-    echo " [ERR]   `date` !!! $__msg "
+    echo " [ERR]   $(date) !!! $__msg "
 }
 
 source_if_exists() {
@@ -100,13 +100,13 @@ download_bashutils_if_newer || exit 1
 
 hello_world(){
   info "[hello_world|in]"
-  _pwd=$(pwd)
+  original_pwd=$(pwd)
   cd "$this_folder"
 
   echo "hello world"
   local result="$?"
 
-  cd "$_pwd"
+  cd "$original_pwd"
   local msg="[hello_world|out] => ${result}"
   [[ ! "$result" -eq "0" ]] && info "$msg" && exit 1
   info "$msg"
