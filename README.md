@@ -20,7 +20,7 @@ This variable is already set up for you in the starter script (see below).
 download a starter script for a new project with:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/jtviegas/bashutils/master/bashutils-template.sh -o ./project.sh && chmod +x ./project.sh
+curl -fsSL https://raw.githubusercontent.com/jtviegas/bashutils/master/bashutils-template.sh -o ./helper.sh && chmod +x ./helper.sh
 ```
 
 the downloaded [`bashutils-template.sh`](./bashutils-template.sh) file is a regular bash script that you can rename and customize for your project.
