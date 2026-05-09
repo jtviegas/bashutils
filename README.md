@@ -7,6 +7,14 @@ include the file in your bash script:
 
 `. ${this_folder}/.bashutils`
 
+where `this_folder` is the directory containing your script, resolved at runtime with:
+
+```bash
+this_folder="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
+```
+
+This variable is already set up for you in the starter script (see below).
+
 ## one-liner setup
 
 download a starter script for a new project with:

@@ -37,17 +37,27 @@ source_if_exists() {
   if [ ! -f "$file" ]; then
     warn "we DON'T have a $(basename "$file") file - creating it"
     touch "$file"
+    chmod 600 "$file"
   else
     . "$file"
   fi
 }
 
+# ---------- CONSTANTS ----------
+export FILE_VARIABLES=${FILE_VARIABLES:-".variables"}
+export FILE_LOCAL_VARIABLES=${FILE_LOCAL_VARIABLES:-".local_variables"}
+export FILE_SECRETS=${FILE_SECRETS:-".secrets"}
+export INCLUDE_FILE=${INCLUDE_FILE:-".bashutils"}
+export BASHUTILS_URL=${BASHUTILS_URL:-"https://raw.githubusercontent.com/jtviegas/bashutils/master/.bashutils"}
+
 download_bashutils_if_newer() {
   local bashutils="$this_folder/$INCLUDE_FILE"
-  local bashutils_tmp="${bashutils}.tmp"
+  local bashutils_tmp
+  bashutils_tmp="$(mktemp)"
 
   if ! command -v curl >/dev/null 2>&1; then
     err "[download_bashutils_if_newer] please install curl"
+    rm -f "$bashutils_tmp"
     return 1
   fi
 
@@ -77,12 +87,6 @@ download_bashutils_if_newer() {
   fi
 }
 
-# ---------- CONSTANTS ----------
-export FILE_VARIABLES=${FILE_VARIABLES:-".variables"}
-export FILE_LOCAL_VARIABLES=${FILE_LOCAL_VARIABLES:-".local_variables"}
-export FILE_SECRETS=${FILE_SECRETS:-".secrets"}
-export INCLUDE_FILE=${INCLUDE_FILE:-".bashutils"}
-
 # -------------------------------
 # --- source variables files
 source_if_exists "$this_folder/$FILE_VARIABLES"
@@ -90,7 +94,6 @@ source_if_exists "$this_folder/$FILE_LOCAL_VARIABLES"
 source_if_exists "$this_folder/$FILE_SECRETS"
 
 # ---------- include bashutils ----------
-BASHUTILS_URL=${BASHUTILS_URL:-"https://raw.githubusercontent.com/jtviegas/bashutils/master/.bashutils"}
 download_bashutils_if_newer || exit 1
 . "$this_folder/$INCLUDE_FILE"
 
@@ -100,6 +103,7 @@ download_bashutils_if_newer || exit 1
 
 hello_world(){
   info "[hello_world|in]"
+  local _pwd
   _pwd=$(pwd)
   cd "$this_folder"
 
