@@ -108,7 +108,7 @@ hello_world(){
 
   cd "$_pwd"
   local msg="[hello_world|out] => ${result}"
-  [[ "$result" -ne 0 ]] && info "$msg" && exit 1
+  [[ "$result" -ne 0 ]] && err "$msg" && exit 1
   info "$msg"
 }
 
