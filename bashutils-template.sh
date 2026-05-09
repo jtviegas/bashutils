@@ -100,15 +100,15 @@ download_bashutils_if_newer || exit 1
 
 hello_world(){
   info "[hello_world|in]"
-  original_pwd=$(pwd)
+  _pwd=$(pwd)
   cd "$this_folder"
 
   echo "hello world"
   local result="$?"
 
-  cd "$original_pwd"
+  cd "$_pwd"
   local msg="[hello_world|out] => ${result}"
-  [[ ! "$result" -eq "0" ]] && info "$msg" && exit 1
+  [[ ! "$result" -eq 0 ]] && info "$msg" && exit 1
   info "$msg"
 }
 
