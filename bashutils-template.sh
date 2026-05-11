@@ -53,8 +53,15 @@ export BASHUTILS_CHECK_INTERVAL_SECONDS=${BASHUTILS_CHECK_INTERVAL_SECONDS:-"864
 
 get_file_mtime_epoch() {
   local file="$1"
-  stat -c %Y "$file" >/dev/null 2>&1 && stat -c %Y "$file" && return 0
-  stat -f %m "$file" >/dev/null 2>&1 && stat -f %m "$file" && return 0
+  local mtime
+  mtime="$(stat -c %Y "$file" 2>/dev/null)" && {
+    echo "$mtime"
+    return 0
+  }
+  mtime="$(stat -f %m "$file" 2>/dev/null)" && {
+    echo "$mtime"
+    return 0
+  }
   return 1
 }
 
@@ -64,16 +71,22 @@ download_bashutils_if_newer() {
   local now_epoch
   local last_check_epoch
   local elapsed
+  local did_remote_check=0
   local bashutils_tmp
 
   if [ -f "$bashutils" ] && [ -f "$bashutils_last_check" ]; then
     now_epoch=$(date +%s)
-    last_check_epoch="$(get_file_mtime_epoch "$bashutils_last_check")"
-    if [[ "$last_check_epoch" =~ ^[0-9]+$ ]]; then
-      elapsed=$((now_epoch - last_check_epoch))
-      if [ "$elapsed" -lt "$BASHUTILS_CHECK_INTERVAL_SECONDS" ]; then
-        return 0
-      fi
+    if last_check_epoch="$(get_file_mtime_epoch "$bashutils_last_check")"; then
+      case "$last_check_epoch" in
+        ''|*[!0-9]*)
+          ;;
+        *)
+          elapsed=$((now_epoch - last_check_epoch))
+          if [ "$elapsed" -lt "$BASHUTILS_CHECK_INTERVAL_SECONDS" ]; then
+            return 0
+          fi
+          ;;
+      esac
     fi
   fi
 
@@ -97,6 +110,7 @@ download_bashutils_if_newer() {
       return 1
     fi
   fi
+  did_remote_check=1
 
   if [ -s "$bashutils_tmp" ]; then
     if ! mv "$bashutils_tmp" "$bashutils"; then
@@ -109,7 +123,9 @@ download_bashutils_if_newer() {
     rm -f "$bashutils_tmp"
   fi
 
-  touch "$bashutils_last_check" || warn "[download_bashutils_if_newer] failed to update last check marker"
+  if [ "$did_remote_check" -eq 1 ]; then
+    touch "$bashutils_last_check" || warn "[download_bashutils_if_newer] failed to update last check marker"
+  fi
 }
 
 # -------------------------------
