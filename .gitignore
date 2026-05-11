@@ -111,3 +111,4 @@ coverage
 bashutils.tar.bz2
 .local_variables
 .variables
+.bashutils.last_check
