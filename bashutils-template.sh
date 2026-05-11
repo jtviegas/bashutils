@@ -49,17 +49,40 @@ export FILE_LOCAL_VARIABLES=${FILE_LOCAL_VARIABLES:-".local_variables"}
 export FILE_SECRETS=${FILE_SECRETS:-".secrets"}
 export INCLUDE_FILE=${INCLUDE_FILE:-".bashutils"}
 export BASHUTILS_URL=${BASHUTILS_URL:-"https://raw.githubusercontent.com/jtviegas/bashutils/master/.bashutils"}
+export BASHUTILS_CHECK_INTERVAL_SECONDS=${BASHUTILS_CHECK_INTERVAL_SECONDS:-"86400"}
+
+get_file_mtime_epoch() {
+  local file="$1"
+  stat -c %Y "$file" >/dev/null 2>&1 && stat -c %Y "$file" && return 0
+  stat -f %m "$file" >/dev/null 2>&1 && stat -f %m "$file" && return 0
+  return 1
+}
 
 download_bashutils_if_newer() {
   local bashutils="$this_folder/$INCLUDE_FILE"
+  local bashutils_last_check="$this_folder/${INCLUDE_FILE}.last_check"
+  local now_epoch
+  local last_check_epoch
+  local elapsed
   local bashutils_tmp
-  bashutils_tmp="$(mktemp)"
+
+  if [ -f "$bashutils" ] && [ -f "$bashutils_last_check" ]; then
+    now_epoch=$(date +%s)
+    last_check_epoch="$(get_file_mtime_epoch "$bashutils_last_check")"
+    if [[ "$last_check_epoch" =~ ^[0-9]+$ ]]; then
+      elapsed=$((now_epoch - last_check_epoch))
+      if [ "$elapsed" -lt "$BASHUTILS_CHECK_INTERVAL_SECONDS" ]; then
+        return 0
+      fi
+    fi
+  fi
 
   if ! command -v curl >/dev/null 2>&1; then
     err "[download_bashutils_if_newer] please install curl"
-    rm -f "$bashutils_tmp"
     return 1
   fi
+
+  bashutils_tmp="$(mktemp)"
 
   if [ ! -f "$bashutils" ]; then
     if ! curl -fsSL -R "$BASHUTILS_URL" -o "$bashutils_tmp"; then
@@ -85,6 +108,8 @@ download_bashutils_if_newer() {
   else
     rm -f "$bashutils_tmp"
   fi
+
+  touch "$bashutils_last_check" || warn "[download_bashutils_if_newer] failed to update last check marker"
 }
 
 # -------------------------------
