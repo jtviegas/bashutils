@@ -7,6 +7,8 @@ on:
 jobs:
   verify-bashutils:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v4
       - name: Verify .bashutils is up to date

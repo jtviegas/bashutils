@@ -3,4 +3,14 @@ set -euo pipefail
 
 this_folder="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 
-cat "$this_folder"/sections/* > "$this_folder/.bashutils"
+mapfile -d '' section_files < <(find "$this_folder/sections" -maxdepth 1 -type f -print0 | sort -z)
+
+[ "${#section_files[@]}" -gt 0 ] || {
+  echo "no section files found in $this_folder/sections" >&2
+  exit 1
+}
+
+: > "$this_folder/.bashutils"
+for section_file in "${section_files[@]}"; do
+  cat "$section_file" >> "$this_folder/.bashutils"
+done
