@@ -125,7 +125,7 @@ download_bashutils_if_newer() {
   fi
 
   if [ "$did_remote_check" -eq 1 ]; then
-    touch "$bashutils_last_check" || warn "[download_bashutils_if_newer] failed to update last check marker"
+    touch "$bashutils_last_check" || warn "[download_bashutils_if_newer] failed to update last check marker; next run will perform a remote check"
   fi
 }
 
