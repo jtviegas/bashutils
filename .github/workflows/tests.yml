@@ -1,0 +1,19 @@
+name: tests
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  bats:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: install bats-core
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y bats
+      - name: bash syntax check
+        run: bash -n bashutils-template.sh
+      - name: run bats tests
+        run: bats test
