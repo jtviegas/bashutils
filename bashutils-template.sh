@@ -48,7 +48,8 @@ export FILE_VARIABLES=${FILE_VARIABLES:-".variables"}
 export FILE_LOCAL_VARIABLES=${FILE_LOCAL_VARIABLES:-".local_variables"}
 export FILE_SECRETS=${FILE_SECRETS:-".secrets"}
 export INCLUDE_FILE=${INCLUDE_FILE:-".bashutils"}
-export BASHUTILS_URL=${BASHUTILS_URL:-"https://raw.githubusercontent.com/jtviegas/bashutils/master/.bashutils"}
+export BASHUTILS_URL=${BASHUTILS_URL:-"https://raw.githubusercontent.com/jtviegas/bashutils/bashutils-250705221643/.bashutils"}
+export BASHUTILS_SHA256=${BASHUTILS_SHA256:-"9cea725169e1e0931002a9bf474746ad25a85799319b48577c266bb77f327d1d"}
 export BASHUTILS_CHECK_INTERVAL_SECONDS=${BASHUTILS_CHECK_INTERVAL_SECONDS:-"86400"}
 
 get_file_mtime_epoch() {
@@ -73,6 +74,7 @@ download_bashutils_if_newer() {
   local elapsed
   local did_remote_check=0
   local bashutils_tmp
+  local actual_sha256
 
   if [ -f "$bashutils" ] && [ -f "$bashutils_last_check" ]; then
     now_epoch=$(date +%s)
@@ -114,6 +116,22 @@ download_bashutils_if_newer() {
   did_remote_check=1
 
   if [ -s "$bashutils_tmp" ]; then
+    if command -v sha256sum >/dev/null 2>&1; then
+      actual_sha256="$(sha256sum "$bashutils_tmp" | awk '{print $1}')"
+    elif command -v shasum >/dev/null 2>&1; then
+      actual_sha256="$(shasum -a 256 "$bashutils_tmp" | awk '{print $1}')"
+    else
+      err "[download_bashutils_if_newer] please install sha256sum or shasum to verify $INCLUDE_FILE"
+      rm -f "$bashutils_tmp"
+      return 1
+    fi
+
+    if [ "$actual_sha256" != "$BASHUTILS_SHA256" ]; then
+      err "[download_bashutils_if_newer] checksum verification failed for $INCLUDE_FILE"
+      rm -f "$bashutils_tmp"
+      return 1
+    fi
+
     if ! mv "$bashutils_tmp" "$bashutils"; then
       err "[download_bashutils_if_newer] failed to replace $INCLUDE_FILE"
       rm -f "$bashutils_tmp"
