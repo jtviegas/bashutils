@@ -49,17 +49,54 @@ export FILE_LOCAL_VARIABLES=${FILE_LOCAL_VARIABLES:-".local_variables"}
 export FILE_SECRETS=${FILE_SECRETS:-".secrets"}
 export INCLUDE_FILE=${INCLUDE_FILE:-".bashutils"}
 export BASHUTILS_URL=${BASHUTILS_URL:-"https://raw.githubusercontent.com/jtviegas/bashutils/master/.bashutils"}
+export BASHUTILS_CHECK_INTERVAL_SECONDS=${BASHUTILS_CHECK_INTERVAL_SECONDS:-"86400"}
+
+get_file_mtime_epoch() {
+  local file="$1"
+  local mtime
+  mtime="$(stat -c %Y "$file" 2>/dev/null)" && {
+    echo "$mtime"
+    return 0
+  }
+  mtime="$(stat -f %m "$file" 2>/dev/null)" && {
+    echo "$mtime"
+    return 0
+  }
+  return 1
+}
 
 download_bashutils_if_newer() {
   local bashutils="$this_folder/$INCLUDE_FILE"
+  local bashutils_last_check="$this_folder/${INCLUDE_FILE}.last_check"
+  local now_epoch
+  local last_check_epoch
+  local elapsed
+  local did_remote_check=0
   local bashutils_tmp
-  bashutils_tmp="$(mktemp)"
+
+  if [ -f "$bashutils" ] && [ -f "$bashutils_last_check" ]; then
+    now_epoch=$(date +%s)
+    if last_check_epoch="$(get_file_mtime_epoch "$bashutils_last_check")"; then
+      case "$last_check_epoch" in
+        ''|*[!0-9]*)
+          warn "[download_bashutils_if_newer] invalid last check marker timestamp, forcing a remote check"
+          ;;
+        *)
+          elapsed=$((now_epoch - last_check_epoch))
+          if [ "$elapsed" -lt "$BASHUTILS_CHECK_INTERVAL_SECONDS" ]; then
+            return 0
+          fi
+          ;;
+      esac
+    fi
+  fi
 
   if ! command -v curl >/dev/null 2>&1; then
     err "[download_bashutils_if_newer] please install curl"
-    rm -f "$bashutils_tmp"
     return 1
   fi
+
+  bashutils_tmp="$(mktemp)"
 
   if [ ! -f "$bashutils" ]; then
     if ! curl -fsSL -R "$BASHUTILS_URL" -o "$bashutils_tmp"; then
@@ -74,6 +111,7 @@ download_bashutils_if_newer() {
       return 1
     fi
   fi
+  did_remote_check=1
 
   if [ -s "$bashutils_tmp" ]; then
     if ! mv "$bashutils_tmp" "$bashutils"; then
@@ -84,6 +122,10 @@ download_bashutils_if_newer() {
     info "[download_bashutils_if_newer] updated $INCLUDE_FILE"
   else
     rm -f "$bashutils_tmp"
+  fi
+
+  if [ "$did_remote_check" -eq 1 ]; then
+    touch "$bashutils_last_check" || warn "[download_bashutils_if_newer] failed to update last check marker; next run will perform a remote check"
   fi
 }
 

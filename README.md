@@ -27,7 +27,7 @@ the downloaded [`bashutils-template.sh`](./bashutils-template.sh) file is a regu
 
 - it creates `.variables`, `.local_variables` and `.secrets` next to the script when needed
 - it downloads `.bashutils` on the first run
-- on later runs it uses a conditional `curl` request and replaces the local `.bashutils` only when a newer version exists on this repository `master` branch
+- on later runs it checks for updates at most once per day and replaces the local `.bashutils` only when a newer version exists on this repository `master` branch
 - you can add your own functions directly to the downloaded script and keep reusing the shared `.bashutils`
 
 ## starter script structure
@@ -41,4 +41,4 @@ the starter script already includes the same header / main / footer layout that 
 (these last two _should not be included in versioning_, add them to `.gitignore` file)
   - it also defines handy logging functions
   - ...and downloads the `.bashutils` include file when needed
-  - ...and later replaces that file only when a newer version is available from this repository master branch
+  - ...and later checks for updates at most once per day, replacing that file only when a newer version is available from this repository master branch
