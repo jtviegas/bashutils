@@ -1847,7 +1847,7 @@ download_function(){
 ############################
 #   name: call_grafana_api
 #   purpose: makes authenticated call to Grafana API via Bifrost
-#   parameters: $1 (Azure access token), $2 (Grafana API token)
+#   parameters: $1 (Azure access token), $2 (Grafana API token), $3 (Grafana API URL, optional - falls back to GRAFANA_API_URL env var)
 ############################
 
 call_grafana_api(){
@@ -1857,8 +1857,10 @@ call_grafana_api(){
   AZURE_ACCESS_TOKEN="$1"
   [ -z $2 ] && err "[call_grafana_api] missing argument GRAFANA_API_TOKEN" && exit 1
   GRAFANA_API_TOKEN="$2"
+  local grafana_api_url="${3:-${GRAFANA_API_URL}}"
+  [ -z "$grafana_api_url" ] && err "[call_grafana_api] missing argument GRAFANA_API_URL (provide as 3rd argument or set GRAFANA_API_URL env var)" && exit 1
 
-  local response=$(curl -s -X GET "https://api.bifrost.heimdall.novonordisk.cloud/grafana/api/org"  \
+  local response=$(curl -s -X GET "${grafana_api_url}"  \
       -H "Authorization: Bearer ${AZURE_ACCESS_TOKEN}" \
       -H "X-Bifrost-Grafana-SA: Bearer ${GRAFANA_API_TOKEN}" )
   result="$?"
