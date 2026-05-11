@@ -79,6 +79,7 @@ download_bashutils_if_newer() {
     if last_check_epoch="$(get_file_mtime_epoch "$bashutils_last_check")"; then
       case "$last_check_epoch" in
         ''|*[!0-9]*)
+          warn "[download_bashutils_if_newer] invalid last check marker timestamp, forcing a remote check"
           ;;
         *)
           elapsed=$((now_epoch - last_check_epoch))
