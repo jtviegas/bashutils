@@ -11,6 +11,13 @@ sections_dir="${1:-"$this_folder/sections"}"
 output_file="${2:-"$this_folder/.bashutils"}"
 sections_order_file="${3:-"$this_folder/sections.order"}"
 
+trim_section_entry() {
+  local value="$1"
+  value="${value#"${value%%[![:space:]]*}"}"
+  value="${value%"${value##*[![:space:]]}"}"
+  printf '%s\n' "$value"
+}
+
 if [ ! -f "$sections_order_file" ]; then
   echo "[build_bashutils] missing sections order file: $sections_order_file" >&2
   exit 1
@@ -26,8 +33,7 @@ trap 'rm -f "$tmp_file"' EXIT
 
 while IFS= read -r section || [ -n "$section" ]; do
   section="${section%%#*}"
-  section="${section#"${section%%[![:space:]]*}"}"
-  section="${section%"${section##*[![:space:]]}"}"
+  section="$(trim_section_entry "$section")"
 
   [ -z "$section" ] && continue
 
@@ -38,7 +44,9 @@ while IFS= read -r section || [ -n "$section" ]; do
   fi
 
   cat "$section_file" >> "$tmp_file"
-  echo >> "$tmp_file"
+  if [ -n "$(tail -c 1 "$section_file")" ]; then
+    echo >> "$tmp_file"
+  fi
 done < "$sections_order_file"
 
 mv "$tmp_file" "$output_file"
