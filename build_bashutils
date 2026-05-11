@@ -1,0 +1,44 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+this_folder="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
+if [ -z "$this_folder" ]; then
+  this_folder=$(dirname "$(readlink -f "$0")")
+fi
+
+sections_dir="${1:-"$this_folder/sections"}"
+output_file="${2:-"$this_folder/.bashutils"}"
+sections_order_file="${3:-"$this_folder/sections.order"}"
+
+if [ ! -f "$sections_order_file" ]; then
+  echo "[build_bashutils] missing sections order file: $sections_order_file" >&2
+  exit 1
+fi
+
+if [ ! -d "$sections_dir" ]; then
+  echo "[build_bashutils] missing sections directory: $sections_dir" >&2
+  exit 1
+fi
+
+tmp_file="$(mktemp)"
+trap 'rm -f "$tmp_file"' EXIT
+
+while IFS= read -r section || [ -n "$section" ]; do
+  section="${section%%#*}"
+  section="${section#"${section%%[![:space:]]*}"}"
+  section="${section%"${section##*[![:space:]]}"}"
+
+  [ -z "$section" ] && continue
+
+  section_file="${sections_dir}/${section}"
+  if [ ! -f "$section_file" ]; then
+    echo "[build_bashutils] missing section file: $section_file" >&2
+    exit 1
+  fi
+
+  cat "$section_file" >> "$tmp_file"
+  echo >> "$tmp_file"
+done < "$sections_order_file"
+
+mv "$tmp_file" "$output_file"
