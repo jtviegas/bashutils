@@ -16,5 +16,5 @@ jobs:
       - name: Run PR reviewer agent
         uses: github/copilot-agent-action@v1
         with:
-          agent-definition: .github/agents/pr-reviewer.agent.md
+          agent-definition: .github/agents/agent-pr-review.agent.md
           github-token: ${{ secrets.GITHUB_TOKEN }}
