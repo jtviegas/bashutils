@@ -58,6 +58,8 @@ aws_get_cloudfront_cidr(){
 
 aws_set_profile(){
   info "[aws_set_profile|in] ($1, $2, ${3:0:5}, $4, $5)"
+  local _pwd
+  _pwd=$(pwd)
 
   [ -z $1 ] && err "[aws_set_profile] missing argument PROFILE" && return 1
   local PROFILE="$1"
