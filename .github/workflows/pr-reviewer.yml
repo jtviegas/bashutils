@@ -12,9 +12,40 @@ jobs:
   agent-review:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - name: Run PR reviewer agent
-        uses: github/copilot-agent-action@v1
+      - name: Checkout Code
+        uses: actions/checkout@v4
         with:
-          agent-definition: .github/agents/agent-pr-review.agent.md
+          fetch-depth: 0
+
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install Copilot CLI
+        run: npm install -g @github/copilot
+
+      - name: Run Agent Review
+        id: agent-review
+        env:
+          GITHUB_TOKEN: ${{ secrets.COPILOT_AGENT_TOKEN }}
+        run: |
+          copilot /agent agent-pr-review "Review the changes in this PR and provide feedback" > review_output.md
+
+      - name: Post Comment to PR
+        uses: actions/github-script@v7
+        with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const fs = require('fs');
+            const body = fs.readFileSync('review_output.md', 'utf8').trim();
+            if (!body) {
+              core.setFailed('Review output is empty');
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body
+              });
+            }
