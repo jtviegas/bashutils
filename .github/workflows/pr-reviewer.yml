@@ -34,20 +34,18 @@ jobs:
           : "${COPILOT_AGENT_TOKEN:?COPILOT_AGENT_TOKEN secret is required}"
           test -f .github/agents/agent-pr-review.agent.md || { echo "Missing agent definition: .github/agents/agent-pr-review.agent.md"; exit 1; }
 
-          local_prompt="Review the changes in this PR and provide feedback"
+          review_prompt="Review the changes in this PR and provide feedback"
 
-          if GITHUB_TOKEN="$COPILOT_AGENT_TOKEN" copilot /agent agent-pr-review "$local_prompt" > review_output.md 2> review_error.log; then
-            :
-          elif GITHUB_TOKEN="$COPILOT_AGENT_TOKEN" copilot agent agent-pr-review "$local_prompt" > review_output.md 2>> review_error.log; then
-            :
-          else
-            echo "Copilot CLI failed with both '/agent' and 'agent' syntaxes"
+          GITHUB_TOKEN="$COPILOT_AGENT_TOKEN" copilot /agent agent-pr-review "$review_prompt" > review_output.md 2> review_error.log || {
             cat review_error.log
             exit 1
-          fi
+          }
 
-          rm -f review_error.log
-          test -s review_output.md || { echo "Review output file is empty or could not be read"; exit 1; }
+          test -s review_output.md || {
+            echo "Review output file is empty or could not be read"
+            cat review_error.log
+            exit 1
+          }
 
       - name: Post Comment to PR
         uses: actions/github-script@v7
@@ -55,17 +53,7 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
             const fs = require('fs');
-            let body;
-            try {
-              body = fs.readFileSync('review_output.md', 'utf8').trim();
-            } catch (error) {
-              core.setFailed(`Review output file is empty or could not be read: ${error.message}`);
-              return;
-            }
-            if (!body) {
-              core.setFailed('Review output file is empty or could not be read.');
-              return;
-            }
+            const body = fs.readFileSync('review_output.md', 'utf8').trim();
             await github.rest.issues.createComment({
               owner: context.repo.owner,
               repo: context.repo.repo,
