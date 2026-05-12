@@ -204,52 +204,68 @@ build_bashutils(){
 
 # add your custom bash functions above this line
 
+############################
+#   name: pr_reviewer
+#   purpose: run Copilot PR reviewer and save output to review_output.md
+#   parameters: none
+#   returns: 0 on success (including fallback output), 1 on setup/output validation errors
+#   requires: GITHUB_TOKEN
+############################
 pr_reviewer(){
-  local _pwd
+  info "[pr_reviewer|in]"
+  local _pwd result msg review_prompt stderr_log rc
   _pwd=$(pwd)
+  result=0
+  stderr_log=""
+
   cd "$this_folder" || return 1
 
   : "${GITHUB_TOKEN:?GITHUB_TOKEN secret is required}"
-  test -f .github/agents/agent-pr-review.agent.md || { echo "Missing agent definition: .github/agents/agent-pr-review.agent.md"; cd "$_pwd" || return 1; return 1; }
+  if ! test -f .github/agents/agent-pr-review.agent.md; then
+    err "Missing agent definition: .github/agents/agent-pr-review.agent.md"
+    result=1
+  fi
 
-  local review_prompt stderr_log rc
-  review_prompt="Review the changes in this PR and provide feedback"
-  stderr_log="$(mktemp)"
+  if [ "$result" -eq 0 ]; then
+    review_prompt="Review the changes in this PR and provide feedback"
+    stderr_log="$(mktemp)"
 
-  copilot --agent agent-pr-review \
-    -p "${review_prompt}" \
-    --allow-all-tools \
-    --no-color \
-    -s > review_output.md 2>"${stderr_log}" || {
-    rc=$?
-    echo "Copilot agent review failed with exit code ${rc}. Captured stderr:"
-    if test -s "${stderr_log}"; then
-      cat "${stderr_log}"
-    else
-      echo "(stderr was empty)"
-    fi
-    if test -s review_output.md; then
-      echo "Captured stdout (last 200 lines):"
-      tail -n 200 review_output.md
-    fi
-    {
-      echo "⚠️ Copilot agent review failed (exit code ${rc})."
-      echo
-      echo "Check this workflow run logs for full details."
-    } > review_output.md
-    rm -f "${stderr_log}"
-    cd "$_pwd" || return 1
-    return 0
-  }
+    copilot --agent agent-pr-review \
+      -p "${review_prompt}" \
+      --allow-all-tools \
+      --no-color \
+      -s > review_output.md 2>"${stderr_log}" || {
+      rc=$?
+      echo "Copilot agent review failed with exit code ${rc}. Captured stderr:"
+      if test -s "${stderr_log}"; then
+        cat "${stderr_log}"
+      else
+        echo "(stderr was empty)"
+      fi
+      if test -s review_output.md; then
+        echo "Captured stdout (last 200 lines):"
+        tail -n 200 review_output.md
+      fi
+      {
+        echo "⚠️ Copilot agent review failed (exit code ${rc})."
+        echo
+        echo "Check this workflow run logs for full details."
+      } > review_output.md
+      :
+    }
+  fi
 
-  rm -f "${stderr_log}"
-  test -s review_output.md || {
+  if [ "$result" -eq 0 ] && ! test -s review_output.md; then
     echo "Review output file is empty or unreadable (Copilot command completed but produced no review output)."
-    cd "$_pwd" || return 1
-    return 1
-  }
+    result=1
+  fi
 
+  [ -n "${stderr_log}" ] && rm -f "${stderr_log}"
   cd "$_pwd" || return 1
+
+  msg="[pr_reviewer|out] => ${result}"
+  [[ "$result" -ne 0 ]] && err "$msg" && return 1
+  info "$msg"
 }
 
 # <=== MAIN SECTION END  <====
