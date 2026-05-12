@@ -38,7 +38,11 @@ jobs:
           review_prompt="Review the changes in this PR and provide feedback"
           stderr_log="$(mktemp)"
 
-          copilot -i "/agent agent-pr-review \"${review_prompt}\"" > review_output.md 2>"${stderr_log}" || {
+          copilot --agent agent-pr-review \
+            -p "${review_prompt}" \
+            --allow-all-tools \
+            --no-color \
+            -s > review_output.md 2>"${stderr_log}" || {
             rc=$?
             echo "Copilot agent review failed with exit code ${rc}. Captured stderr:"
             if test -s "${stderr_log}"; then
@@ -50,8 +54,13 @@ jobs:
               echo "Captured stdout (last 200 lines):"
               tail -n 200 review_output.md
             fi
+            {
+              echo "⚠️ Copilot agent review failed (exit code ${rc})."
+              echo
+              echo "Check this workflow run logs for full details."
+            } > review_output.md
             rm -f "${stderr_log}"
-            exit "${rc}"
+            :
           }
 
           rm -f "${stderr_log}"
