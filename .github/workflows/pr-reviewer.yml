@@ -43,7 +43,6 @@ jobs:
 
           test -s review_output.md || {
             echo "Review output file is empty or could not be read"
-            cat review_output.md
             exit 1
           }
 
