@@ -163,6 +163,9 @@ build_bashutils(){
   local sections_dir="$this_folder/sections"
   local out_file="$this_folder/$INCLUDE_FILE"
   local out_checksum_file="$this_folder/${INCLUDE_FILE}.checksum"
+  local _pwd
+  local checksum_result
+  _pwd=$(pwd)
 
   [ ! -d "$sections_dir" ] && err "[build_bashutils] sections folder not found: $sections_dir" && return 1
 
@@ -177,15 +180,21 @@ build_bashutils(){
   done
 
   if command -v sha256sum >/dev/null 2>&1; then
-    (
-      cd "$this_folder" || return 1
-      sha256sum "$INCLUDE_FILE" > "$(basename "$out_checksum_file")"
-    ) || return 1
+    cd "$this_folder" || return 1
+    sha256sum "$INCLUDE_FILE" > "$(basename "$out_checksum_file")"
+    checksum_result="$?"
+    cd "$_pwd" || return 1
+    if [ "$checksum_result" -ne 0 ]; then
+      return 1
+    fi
   elif command -v shasum >/dev/null 2>&1; then
-    (
-      cd "$this_folder" || return 1
-      shasum -a 256 "$INCLUDE_FILE" > "$(basename "$out_checksum_file")"
-    ) || return 1
+    cd "$this_folder" || return 1
+    shasum -a 256 "$INCLUDE_FILE" > "$(basename "$out_checksum_file")"
+    checksum_result="$?"
+    cd "$_pwd" || return 1
+    if [ "$checksum_result" -ne 0 ]; then
+      return 1
+    fi
   else
     err "[build_bashutils] please install sha256sum or shasum to generate checksum file"
     return 1

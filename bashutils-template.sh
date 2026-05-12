@@ -119,7 +119,7 @@ download_bashutils_if_newer() {
       rm -f "$checksum_tmp"
       return 1
     fi
-    expected_sha256="$(awk 'match($0, /[a-fA-F0-9]{64}/) { print substr($0, RSTART, RLENGTH); exit }' "$checksum_tmp" | tr 'A-F' 'a-f')"
+    expected_sha256="$(awk -v include_file="$INCLUDE_FILE" '$2 == include_file && $1 ~ /^[a-fA-F0-9]{64}$/ { print tolower($1); exit }' "$checksum_tmp")"
     rm -f "$checksum_tmp"
     if [ -z "$expected_sha256" ]; then
       err "[download_bashutils_if_newer] invalid checksum file format from $(basename "$BASHUTILS_CHECKSUM_URL")"
