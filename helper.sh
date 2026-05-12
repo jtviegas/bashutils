@@ -223,7 +223,7 @@ prompt_copilot_agent(){
 
   review_prompt="Review the changes in this PR and provide feedback"
   stderr_log="$(mktemp)"
-
+  gh auth status
   copilot --agent code-review \
     -p "${review_prompt}" \
     --allow-all-tools \
