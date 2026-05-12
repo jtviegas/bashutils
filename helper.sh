@@ -230,7 +230,7 @@ prompt_copilot_agent(){
     --no-color
   #  -s > review_output.md 2>"${stderr_log}"
   result="$?"
-  "cat review_output.md
+  #cat review_output.md
   
 
   cd "$_pwd"
