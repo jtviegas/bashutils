@@ -42,4 +42,4 @@ the starter script already includes the same header / main / footer layout that 
   - it also defines handy logging functions
   - ...and downloads the `.bashutils` include file when needed
   - ...and later checks for updates at most once per day, replacing that file only when a newer version is available from this repository master branch
-- the helper script [`build_bashutils`](./build_bashutils) reads section files from `sections/` using the explicit order declared in [`sections.order`](./sections.order), avoiding dependency issues caused by alphabetical concatenation
+- running `./helper.sh build_bashutils` reads section files from `sections/` using the explicit order declared in [`sections.order`](./sections.order), avoiding dependency issues caused by alphabetical concatenation

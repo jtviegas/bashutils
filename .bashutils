@@ -1,416 +1,4 @@
 ##########################################
-#######  ------- assorted -------  #######
-##########################################
-
-############################
-#   name: test_js_lambda
-#   purpose: installs npm dependencies and runs Jest tests for a JavaScript Lambda function
-#   parameters: $1 (path to the Lambda function directory containing package.json)
-#   requires: npm, jest
-############################
-test_js_lambda(){
-  info "[test_js_lambda|in] ({$1})"
-
-  [ -z $1 ] && err "[get_cloudfront_cidr] missing argument FUNCTION_DIR" && exit 1
-  local FUNCTION_DIR="$1"
-  _pwd=`pwd`
-  cd "$FUNCTION_DIR"
-
-  npm install
-  jest
-
-  result="$?"
-  cd "$_pwd"
-  [ "$result" -ne "0" ] && err "[test_js_lambda|out]  => ${result}" && exit 1
-  info "[test_js_lambda|out] => ${result}"
-}
-
-############################
-#   name: zip_js_lambda_function
-#   purpose: packages a JavaScript Lambda function into a zip archive;
-#            installs npm dependencies if package.json is present and removes the bundled aws-sdk
-#            (provided by the Lambda runtime) to reduce bundle size
-#   parameters: $1 (source directory), $2 (output zip file path), $3+ (files/folders to include in the zip)
-#   requires: npm, zip
-############################
-
-zip_js_lambda_function(){
-  info "[zip_js_lambda_function] ...( $@ )"
-  local usage_msg=$'zip_js_lambda_function: zips a js lambda function:\nusage:\n    zip_js_lambda_function SRC_DIR ZIP_FILE { FILES FOLDERS ... }'
-
-  verify_prereqs npm
-  if [ ! "$?" -eq "0" ] ; then return 1; fi
-
-  if [ -z "$3" ] ; then echo "$usage_msg" && return 1; fi
-
-  local src_dir="$1"
-  local zip_file="$2"
-  local files="${@:3}"
-  local AWS_SDK_MODULE_PATH=$src_dir/node_modules/aws-sdk
-
-  _pwd=`pwd`
-  cd "$src_dir"
-
-  if [ -f "package.json" ]; then
-    npm install &>/dev/null
-    if [ ! "$?" -eq "0" ] ; then err "[zip_js_lambda_function] could not install dependencies" && cd "$_pwd" && return 1; fi
-    if [ -d "${AWS_SDK_MODULE_PATH}" ]; then rm -r "$AWS_SDK_MODULE_PATH"; fi
-  fi
-
-  rm -f "$zip_file"
-  zip -9 -q -r "$zip_file" "$files" &>/dev/null
-  if [ ! "$?" -eq "0" ] ; then err "[zip_js_lambda_function] could not zip it" && cd "$_pwd" && return 1; fi
-
-  cd "$_pwd"
-  info "[zip_js_lambda_function] ...done."
-}
-
-############################
-#   name: get_function_release
-#   purpose: downloads a named artifact from the latest GitHub release of a repository into this_folder
-#   parameters: $1 (GitHub repository in 'owner/repo' format), $2 (artifact filename to match)
-#   requires: curl, wget, this_folder
-############################
-
-get_function_release(){
-  info "[get_function_release] ...( $@ )"
-  local usage_msg=$'get_function_release: retrieves a function release artifact from github:\nusage:\n    get_function_release REPO ARTIFACT'
-
-  if [ -z "$2" ] ; then echo "$usage_msg" && return 1; fi
-  local repo="$1"
-  local artifact="$2"
-
-  _pwd=`pwd`
-  cd "$this_folder"
-
-  curl -s "https://api.github.com/repos/${repo}/releases/latest" \
-  | grep "browser_download_url.*${artifact}" \
-  | cut -d '"' -f 4 | wget -qi -
-
-  cd "$_pwd"
-  info "[get_function_release] ...done."
-}
-
-############################
-#   name: download_function
-#   purpose: downloads a named artifact from the latest GitHub release of a repository and saves it to a specific local file
-#   parameters: $1 (GitHub repository in 'owner/repo' format), $2 (artifact filename to match), $3 (local destination file path)
-#   requires: curl, wget
-############################
-
-download_function(){
-  info "[download_function|in] ...( $@ )"
-  local usage_msg=$'download_function: downloads a function release artifact from github:\nusage:\n    download_function REPO ARTIFACT DESTINATION_FILE'
-
-  if [ -z "$3" ] ; then echo "$usage_msg" && return 1; fi
-  local repo="$1"
-  local artifact="$2"
-  local file="$3"
-
-  curl -s "https://api.github.com/repos/${repo}/releases/latest" \
-  | grep "browser_download_url.*${artifact}" \
-  | cut -d '"' -f 4 | wget -O "$file" -qi  -
-  if [ ! "$?" -eq "0" ]; then err "[download_function] curl command was not successful" && return 1; fi
-
-  info "[download_function|out] ...done."
-}
-
-############################
-#   name: call_grafana_api
-#   purpose: makes an authenticated GET request to a Grafana API endpoint through a proxy/gateway,
-#            passing both an Azure bearer token and a Grafana service account token
-#   parameters: $1 (Azure OAuth2 access token), $2 (Grafana service account API token)
-#   requires: curl
-############################
-
-call_grafana_api(){
-  info "[call_grafana_api|in] (${1:0:3}, ${2:0:3})"
-
-  [ -z $1 ] && err "[call_grafana_api] missing argument AZURE_ACCESS_TOKEN" && exit 1
-  AZURE_ACCESS_TOKEN="$1"
-  [ -z $2 ] && err "[call_grafana_api] missing argument GRAFANA_API_TOKEN" && exit 1
-  GRAFANA_API_TOKEN="$2"
-
-  local response=$(curl -s -X GET "https://api.bifrost.heimdall.novonordisk.cloud/grafana/api/org"  \
-      -H "Authorization: Bearer ${AZURE_ACCESS_TOKEN}" \
-      -H "X-Bifrost-Grafana-SA: Bearer ${GRAFANA_API_TOKEN}" )
-  result="$?"
-
-  [ "$result" -ne "0" ] && err "[call_grafana_api|out]  => ${result}" && exit 1
-  info "[call_grafana_api|out] => ${response}"
-}
-
-##########################################
-#######     ------- aws -------    #######
-##########################################
-
-############################
-#   name: aws_find_kms_alias
-#   purpose: checks whether a KMS key alias exists in the current AWS account
-#   parameters: $1 (full alias name, e.g. alias/my-key)
-#   returns: 0 if the alias exists, 1 if not found
-#   requires: aws, jq
-############################
-aws_find_kms_alias(){
-  echo "[aws_find_kms_alias|in] ($1)"
-
-  [ -z $1 ] && err "[aws_find_kms_alias] missing argument ALIAS" && exit 1
-  local ALIAS="$1"
-  result=1
-
-  local alias_resource=$(aws kms list-aliases | jq -r ".\"Aliases\" | .[] | select(.AliasName == \"$ALIAS\") | .AliasName")
-  echo "[aws_find_kms_alias] alias_resource: ${alias_resource}"
-  if [ "$alias_resource" != "" ]; then
-    result=0
-  fi
-
-  echo "[aws_find_kms_alias|out] => ${result}"
-  return ${result}
-}
-
-############################
-#   name: aws_get_cloudfront_cidr
-#   purpose: retrieves the CIDR entries from the CloudFront origin-facing managed prefix list and writes them as JSON to a file
-#   parameters: $1 (output file path)
-#   requires: aws, jq
-############################
-
-aws_get_cloudfront_cidr(){
-  info "[aws_get_cloudfront_cidr|in] ($1)"
-
-  [ -z $1 ] && err "[aws_get_cloudfront_cidr] missing argument OUTPUT_FILE" && exit 1
-  local OUTPUT_FILE="$1"
-
-  local prefix_list_id=$(aws ec2 describe-managed-prefix-lists | jq -r ".\"PrefixLists\" | .[] | select(.PrefixListName == \"com.amazonaws.global.cloudfront.origin-facing\") | .PrefixListId")
-  local outputs=$(aws ec2 get-managed-prefix-list-entries --prefix-list-id "$prefix_list_id" --output json)
-  echo $outputs | jq -r ".\"Entries\"" > "$OUTPUT_FILE"
-
-  result="$?"
-  [ "$result" -ne "0" ] && err "[aws_get_cloudfront_cidr|out]  => ${result}" && exit 1
-  info "[aws_get_cloudfront_cidr|out] => ${result}"
-}
-
-############################
-#   name: aws_set_profile
-#   purpose: configures a named AWS CLI profile with static credentials and region using 'aws configure'
-#   parameters: $1 (profile name), $2 (AWS access key ID), $3 (AWS secret access key),
-#               $4 (AWS region, e.g. eu-west-1), $5 (output format, default: json)
-#   requires: aws
-############################
-
-aws_set_profile(){
-  info "[aws_set_profile|in] ($1, $2, ${3:0:5}, $4, $5)"
-
-  [ -z $1 ] && err "[aws_set_profile] missing argument PROFILE" && return 1
-  local PROFILE="$1"
-  [ -z $2 ] && err "[aws_set_profile] missing argument KEY" && return 1
-  local KEY="$2"
-  [ -z $3 ] && err "[aws_set_profile] missing argument SECRET" && return 1
-  local SECRET="$3"
-  [ -z $4 ] && err "[aws_set_profile] missing argument REGION" && return 1
-  local REGION="$4"
-
-  if [ ! -z $5 ]; then
-    local OUTPUT="$5"
-  else
-    local OUTPUT="json"
-  fi
-
-  aws configure --profile $PROFILE set region $REGION \
-    && aws configure --profile $PROFILE set output $OUTPUT \
-    && aws configure --profile $PROFILE set aws_secret_access_key $SECRET \
-    && aws configure --profile $PROFILE set aws_access_key_id $KEY
-
-  result="$?"
-  cd "$_pwd"
-  [ "$result" -ne "0" ] && err "[aws_set_profile|out]  => ${result}" && exit 1
-  info "[aws_set_profile|out] => ${result}"
-}
-
-##########################################
-#######   ------- azure -------    #######
-##########################################
-
-############################
-#   name: az_sp_assign_subscription
-#   purpose: grants Contributor role to a service principal on the specified Azure subscription
-#   parameters: none
-#   requires: APP_ID (service principal app/client ID), ARM_SUBSCRIPTION_ID, az
-############################
-az_sp_assign_subscription()
-{
-  info "[az_sp_assign_subscription|in]"
-  az role assignment create --assignee "${APP_ID}" --role "Contributor" --scope "/subscriptions/${ARM_SUBSCRIPTION_ID}"
-  info "[az_sp_assign_subscription|out]"
-}
-
-############################
-#   name: az_sp_login
-#   purpose: authenticates the Azure CLI using service principal credentials (non-interactive)
-#   parameters: none
-#   requires: APP_ID (client ID), ARM_CLIENT_SECRET, ARM_TENANT_ID, az
-############################
-
-az_sp_login()
-{
-  info "[az_sp_login|in]"
-  az login --service-principal -u "${APP_ID}" -p "${ARM_CLIENT_SECRET}" --tenant "${ARM_TENANT_ID}" #--subscription "${ARM_SUBSCRIPTION_ID}"
-  info "[az_sp_login|out]"
-}
-
-############################
-#   name: az_login_check
-#   purpose: validates that the current Azure CLI session is active by performing a lightweight read-only API call
-#   parameters: none
-#   requires: az
-############################
-
-az_login_check()
-{
-  info "[az_login_check|in]"
-  az vm list-sizes --location westus
-  info "[az_login_check|out]"
-}
-
-############################
-#   name: az_logout
-#   purpose: signs out of the Azure CLI, clearing all cached credentials
-#   parameters: none
-#   requires: az
-############################
-
-az_logout()
-{
-  info "[az_logout|in]"
-  az logout
-  info "[az_logout|out]"
-}
-
-############################
-#   name: az_list_sp_roles
-#   purpose: lists all role assignments (principalName, role, scope) for a given service principal
-#   parameters: $1 (service principal app display name or object ID)
-#   requires: az
-############################
-
-az_list_sp_roles()
-{
-  info "[az_list_sp_roles|in] ($1)"
-
-  [ -z "$1" ] && err "no sp app display name provided" && exit 1
-  sp_app_name="$1"
-  az role assignment list --all --assignee "${sp_app_name}" --output json --query '[].{principalName:principalName, roleDefinitionName:roleDefinitionName, scope:scope}'
-
-  info "[az_list_sp_roles|out]"
-}
-
-############################
-#   name: az_storage_account_web_config
-#   purpose: enables static website hosting on an Azure Blob storage account (index: index.html, 404: 404.html),
-#            adds permissive CORS if not already configured, and stores the resulting website URL
-#            in the variables file via add_entry_to_variables
-#   parameters: $1 (storage account name), $2 (resource group name)
-#   requires: az, add_entry_to_variables
-############################
-
-az_storage_account_web_config(){
-  info "[az_storage_account_web_config|in] ($1, $2)"
-
-  [ -z "$1" ] && err "[az_storage_account_web_config] no STORAGE_ACCOUNT param provided" && exit 1
-  local STORAGE_ACCOUNT="$1"
-  [ -z "$2" ] && err "[az_storage_account_web_config] no resource group provided" && exit 1
-  local RESOURCE_GROUP="$2"
-
-  az storage blob service-properties update --account-name "$STORAGE_ACCOUNT" --static-website true \
-    --index-document "index.html" --404-document "404.html" #--debug --verbose 
-  result="$?"
-
-  if [ "$result" -eq "0" ]; then
-    cors_config=$(az storage cors list --account-name pvdi0textmining0website)
-    cors_result="$?"
-    info "[az_storage_account_web_config] cors_config result: $?"
-    info "[az_storage_account_web_config] cors_config: ->$cors_config<-"
-
-    if [[ "$cors_result" -eq "0" && "$cors_config" != "[]" ]]; then
-      warn "[az_storage_account_web_config] there is cors config already"
-    else
-      info "[az_storage_account_web_config] there is no cors config, goint to set it up"
-      az storage cors add --account-name "$STORAGE_ACCOUNT" --services b --methods GET --origins "*" --allowed-headers "*" --exposed-headers "*"
-      result="$?"
-    fi
-  fi
-
-  if [ "$result" -eq "0" ]; then
-    url=$(az storage account show --name "$STORAGE_ACCOUNT" --resource-group "$RESOURCE_GROUP" --query "primaryEndpoints.web" --output tsv) && \
-      add_entry_to_variables WEBSITE_URL "\"$url\""
-    result="$?"
-  fi
-
-  [ "$result" -ne "0" ] && err "[az_storage_account_web_config|out] could not configure bucket" && exit 1
-
-  info "[az_storage_account_web_config|out] => ${result}"
-}
-
-############################
-#   name: az_upload_static_website
-#   purpose: uploads all files from a local folder to the '$web' blob container of an Azure storage account (overwrites existing blobs)
-#   parameters: $1 (storage account name), $2 (local source folder path)
-#   requires: az
-############################
-
-az_upload_static_website(){
-  info "[az_upload_static_website|in] ($1, $2)"
-
-  [ -z "$1" ] && err "[az_upload_static_website] no STORAGE_ACCOUNT param provided" && exit 1
-  local STORAGE_ACCOUNT="$1"
-  [ -z "$2" ] && err "[az_upload_static_website] no SOURCE_FOLDER param provided" && exit 1
-  local SOURCE_FOLDER="$2"
-
-  az storage blob upload-batch --account-name $STORAGE_ACCOUNT --source $SOURCE_FOLDER --destination '$web' --debug --verbose --overwrite
-
-  result="$?"
-  [ "$result" -ne "0" ] && err "[az_upload_static_website|out] could not configure bucket" && exit 1
-
-  info "[az_upload_static_website|out] => ${result}"
-}
-
-############################
-#   name: get_azure_access_token
-#   purpose: obtains an OAuth2 access token from Azure AD using client credentials flow
-#            and persists it as AZURE_ACCESS_TOKEN in the secrets file via add_entry_to_secrets
-#   parameters: $1 (Azure tenant ID), $2 (client/app ID), $3 (client secret), $4 (OAuth2 scope, e.g. 'https://management.azure.com/.default')
-#   requires: curl, jq, add_entry_to_secrets
-############################
-
-get_azure_access_token(){
-  info "[get_azure_access_token|in] ($1, $2, ${3:0:3}, $4)"
-
-  [ -z $1 ] && err "[get_azure_access_token] missing argument TENANT_ID" && exit 1
-  TENANT_ID="$1"
-  [ -z $2 ] && err "[get_azure_access_token] missing argument BIFROST_CLIENT_ID" && exit 1
-  BIFROST_CLIENT_ID="$2"
-  [ -z $3 ] && err "[get_azure_access_token] missing argument APP_REG_CLIENT_SECRET" && exit 1
-  BIFROST_CLIENT_SECRET="$3"
-  [ -z $4 ] && err "[get_azure_access_token] missing argument SCOPE" && exit 1
-  SCOPE="$4"
-
-
-  local azure_token_api=https://login.microsoftonline.com/${TENANT_ID}/oauth2/v2.0/token
-
-  local response=$(curl -s -X POST "${azure_token_api}" -H "Content-Type: application/x-www-form-urlencoded" \
-      --data-urlencode "grant_type=client_credentials" \
-      --data-urlencode "client_id=${BIFROST_CLIENT_ID}" \
-      --data-urlencode "client_secret=${BIFROST_CLIENT_SECRET}" \
-      --data-urlencode "scope=${SCOPE}" )
-  result="$?"
-  access_token=$(echo "$response" | jq -r '.access_token')
-  add_entry_to_secrets "AZURE_ACCESS_TOKEN" "$access_token"
-
-  [ "$result" -ne "0" ] && err "[get_azure_access_token|out]  => ${result}" && exit 1
-  info "[get_azure_access_token|out] => ${access_token}"
-}
-
-##########################################
 #######    ------- bash -------    #######
 ##########################################
 
@@ -794,7 +382,198 @@ print_uuid(){
 
   echo "[print_uuid|out]"
 }
+##########################################
+####### ------- terraform -------  #######
+##########################################
 
+############################
+#   name: terraform_autodeploy
+#   purpose: runs a full Terraform deployment (init → plan → apply --auto-approve) in the given folder
+#   parameters: $1 (path to the folder containing Terraform configuration files)
+#   requires: terraform
+############################
+terraform_autodeploy(){
+  info "[terraform_autodeploy] ..."
+
+  [ -z $1 ] && err "[terraform_autodeploy] missing function argument FOLDER" && return 1
+  local folder="$1"
+
+  verify_prereqs terraform
+  if [ ! "$?" -eq "0" ] ; then return 1; fi
+
+  _pwd=$(pwd)
+  cd "$folder"
+
+  terraform init
+  terraform plan
+  terraform apply -auto-approve -lock=true -lock-timeout=10m
+  if [ ! "$?" -eq "0" ]; then err "[terraform_autodeploy] could not apply" && cd "$_pwd" && return 1; fi
+  cd "$_pwd"
+  info "[terraform_autodeploy] ...done."
+}
+
+############################
+#   name: terraform_autodestroy
+#   purpose: runs 'terraform destroy --auto-approve' in the given folder to tear down all managed infrastructure
+#   parameters: $1 (path to the folder containing Terraform configuration files)
+#   requires: terraform
+############################
+
+terraform_autodestroy(){
+  info "[terraform_autodestroy] ..."
+
+  [ -z $1 ] && err "[terraform_autodestroy] missing function argument FOLDER" && return 1
+  local folder="$1"
+
+  verify_prereqs terraform
+  if [ ! "$?" -eq "0" ] ; then return 1; fi
+
+  _pwd=$(pwd)
+  cd "$folder"
+
+  terraform destroy -auto-approve -lock=true -lock-timeout=10m
+  if [ ! "$?" -eq "0" ]; then err "[terraform_autodestroy] could not apply" && cd "$_pwd" && return 1; fi
+  cd "$_pwd"
+  info "[terraform_autodestroy] ...done."
+}
+##########################################
+#######     ------- js -------     #######
+##########################################
+
+############################
+#   name: npm_deps
+#   purpose: runs 'npm install' in the specified project directory
+#   parameters: $1 (path to the directory containing package.json)
+#   requires: npm
+############################
+npm_deps(){
+  info "[npm_deps|in] ($1)"
+
+  [ -z $1 ] && err "[npm_deps] missing argument INFRA_DIR" && exit 1
+  local INFRA_DIR="$1"
+
+  _pwd=`pwd`
+  cd "$INFRA_DIR"
+
+  npm install
+
+  result="$?"
+  cd "$_pwd"
+  [ "$result" -ne "0" ] && err "[npm_deps|out]  => ${result}" && exit 1
+  info "[npm_deps|out] => ${result}"
+}
+
+############################
+#   name: npm_publish
+#   purpose: authenticates against a private npm registry and publishes the package as public
+#   parameters: $1 (registry hostname, e.g. npm.pkg.github.com), $2 (auth token), $3 (path to package folder)
+#   requires: npm
+############################
+
+npm_publish(){
+  info "[npm_publish|in] ($1, $2)"
+
+  [ -z $1 ] && err "[npm_publish] missing argument NPM_REGISTRY" && return 1
+  local registry="$1"
+  [ -z $2 ] && err "[npm_publish] missing argument NPM_TOKEN" && return 1
+  local token="$2"
+  [ -z $3 ] && err "[npm_publish] missing argument FOLDER" && return 1
+  local folder="$3"
+
+  _pwd=`pwd`
+  cd "$folder"
+  npm config set "//${registry}/:_authToken" "${token}"
+  npm publish . --access="public"
+  if [ ! "$?" -eq "0" ]; then err "[npm_publish] could not publish" && cd "$_pwd" && return 1; fi
+  cd "$_pwd"
+  info "[npm_publish] ...done."
+}
+##########################################
+#######     ------- aws -------    #######
+##########################################
+
+############################
+#   name: aws_find_kms_alias
+#   purpose: checks whether a KMS key alias exists in the current AWS account
+#   parameters: $1 (full alias name, e.g. alias/my-key)
+#   returns: 0 if the alias exists, 1 if not found
+#   requires: aws, jq
+############################
+aws_find_kms_alias(){
+  echo "[aws_find_kms_alias|in] ($1)"
+
+  [ -z $1 ] && err "[aws_find_kms_alias] missing argument ALIAS" && exit 1
+  local ALIAS="$1"
+  result=1
+
+  local alias_resource=$(aws kms list-aliases | jq -r ".\"Aliases\" | .[] | select(.AliasName == \"$ALIAS\") | .AliasName")
+  echo "[aws_find_kms_alias] alias_resource: ${alias_resource}"
+  if [ "$alias_resource" != "" ]; then
+    result=0
+  fi
+
+  echo "[aws_find_kms_alias|out] => ${result}"
+  return ${result}
+}
+
+############################
+#   name: aws_get_cloudfront_cidr
+#   purpose: retrieves the CIDR entries from the CloudFront origin-facing managed prefix list and writes them as JSON to a file
+#   parameters: $1 (output file path)
+#   requires: aws, jq
+############################
+
+aws_get_cloudfront_cidr(){
+  info "[aws_get_cloudfront_cidr|in] ($1)"
+
+  [ -z $1 ] && err "[aws_get_cloudfront_cidr] missing argument OUTPUT_FILE" && exit 1
+  local OUTPUT_FILE="$1"
+
+  local prefix_list_id=$(aws ec2 describe-managed-prefix-lists | jq -r ".\"PrefixLists\" | .[] | select(.PrefixListName == \"com.amazonaws.global.cloudfront.origin-facing\") | .PrefixListId")
+  local outputs=$(aws ec2 get-managed-prefix-list-entries --prefix-list-id "$prefix_list_id" --output json)
+  echo $outputs | jq -r ".\"Entries\"" > "$OUTPUT_FILE"
+
+  result="$?"
+  [ "$result" -ne "0" ] && err "[aws_get_cloudfront_cidr|out]  => ${result}" && exit 1
+  info "[aws_get_cloudfront_cidr|out] => ${result}"
+}
+
+############################
+#   name: aws_set_profile
+#   purpose: configures a named AWS CLI profile with static credentials and region using 'aws configure'
+#   parameters: $1 (profile name), $2 (AWS access key ID), $3 (AWS secret access key),
+#               $4 (AWS region, e.g. eu-west-1), $5 (output format, default: json)
+#   requires: aws
+############################
+
+aws_set_profile(){
+  info "[aws_set_profile|in] ($1, $2, ${3:0:5}, $4, $5)"
+
+  [ -z $1 ] && err "[aws_set_profile] missing argument PROFILE" && return 1
+  local PROFILE="$1"
+  [ -z $2 ] && err "[aws_set_profile] missing argument KEY" && return 1
+  local KEY="$2"
+  [ -z $3 ] && err "[aws_set_profile] missing argument SECRET" && return 1
+  local SECRET="$3"
+  [ -z $4 ] && err "[aws_set_profile] missing argument REGION" && return 1
+  local REGION="$4"
+
+  if [ ! -z $5 ]; then
+    local OUTPUT="$5"
+  else
+    local OUTPUT="json"
+  fi
+
+  aws configure --profile $PROFILE set region $REGION \
+    && aws configure --profile $PROFILE set output $OUTPUT \
+    && aws configure --profile $PROFILE set aws_secret_access_key $SECRET \
+    && aws configure --profile $PROFILE set aws_access_key_id $KEY
+
+  result="$?"
+  cd "$_pwd"
+  [ "$result" -ne "0" ] && err "[aws_set_profile|out]  => ${result}" && exit 1
+  info "[aws_set_profile|out] => ${result}"
+}
 ##########################################
 #######     ------- cdk -------    #######
 ##########################################
@@ -974,267 +753,6 @@ cdk_setup()
     [ "$result" -ne "0" ] && err "[cdk_setup|out]  => ${result}" && exit 1
     info "[cdk_setup|out] => ${result}"
 }
-
-##########################################
-#######  ------- commons -------   #######
-##########################################
-
-############################
-#   name: commands
-#   purpose: prints a quick-reference cheat sheet of commonly used commands covering:
-#            Python virtualenv/Jupyter, AWS CDK (TypeScript), AWS CLI, and git configuration
-#   parameters: none
-############################
-commands() {
-  cat <<EOM
-
-  handy commands:
-
-  python -m venv .venv                                             create virtual environment
-  jupyter-notebook --log-level=40 --no-browser                            starts jupyter server
-  cdk init app --language typescript                                      create new cdk app on typescript
-  npm run build                                                           compile typescript to js
-  npm run watch                                                           watch for changes and compile
-  npm run test                                                            perform the jest unit tests
-  git config user.email "$JTV_GITHUB_EMAIL"                               set local git config email
-  aws-cdk
-    cdk init app --language typescript                                    create new cdk app on typescript
-    cdk deploy                                                            deploy this stack to your default AWS account/region
-    cdk diff                                                              compare deployed stack with current state
-    cdk synth                                                             emits the synthesized CloudFormation template
-  aws
-    aws cloudformation delete-stack --stack-name <STACKNAME>              delete stack to later recreate with bootstrap (see https://stackoverflow.com/questions/71280758/aws-cdk-bootstrap-itself-broken/71283964#71283964)
-    aws configure sso --profile nn --no-browser                           configure sso
-    export AWS_PROFILE=nn                                                 set current environment profile
-    aws sts get-caller-identity                                           check current session
-    aws sts get-caller-identity --profile <PROFILE>                       display session profile info
-    aws lambda invoke --function-name FUNCTION_NAME out --log-type Tail 
-
-EOM
-}
-
-##########################################
-####### ------- databricks ------- #######
-##########################################
-
-############################
-#   name: databricks_set_cli_access
-#   purpose: authenticates interactively with Azure, retrieves a Databricks access token,
-#            and persists DATABRICKS_HOST and DATABRICKS_TOKEN via add_entry_to_variables/add_entry_to_secrets
-#   parameters: $1 (Databricks workspace URL, e.g. https://<workspace>.azuredatabricks.net), $2 (Azure subscription ID)
-#   requires: az, add_entry_to_variables, add_entry_to_secrets
-############################
-databricks_set_cli_access()
-{
-  info "[databricks_set_cli_access|in] ($1, $2)"
-  [ -z "$2" ] && err "no subscription Id provided" && return 1
-  [ -z "$1" ] && err "no workspace url provided" && return 1
-
-  # dd62d6ec-d618-49ad-bd43-04a2ef12c0fb
-
-  az login
-  az account set --subscription "$2"
-  token=$(az account get-access-token --resource 2ff814a6-3304-4ab8-85cb-cd0e6f879c1d --query "accessToken" --output tsv)
-  add_entry_to_variables DATABRICKS_HOST "$1"
-  add_entry_to_secrets DATABRICKS_TOKEN "$token"
-  info "[databricks_set_cli_access|out]"
-}
-
-############################
-#   name: databricks_bundle_deploy
-#   purpose: validates and deploys a Databricks Asset Bundle to the specified target environment
-#   parameters: $1 (path to the bundle folder containing databricks.yml), $2 (deployment target: local | main, default: local)
-#   requires: databricks
-############################
-
-databricks_bundle_deploy(){
-  info "[databricks_bundle_deploy|in]"
-
-  [ -z $1 ] && err "[databricks_bundle_deploy] missing argument BUNDLE_FOLDER" && exit 1
-  local BUNDLE_FOLDER="$1"
-  local BUNDLE_TARGET="local"
-  [ ! -z $2 ] && BUNDLE_TARGET="$2"
-
-  [ "main" != "$BUNDLE_TARGET" ] && [ "local" != "$BUNDLE_TARGET" ] && err "[databricks_bundle_deploy] wrong argument BUNDLE_TARGET: $BUNDLE_TARGET" && exit 1
-  info "[databricks_bundle_deploy] BUNDLE_FOLDER: $BUNDLE_FOLDER   BUNDLE_TARGET: $BUNDLE_TARGET"
-
-  _pwd=`pwd`
-  cd "$BUNDLE_FOLDER"
-
-  databricks bundle validate --target "$BUNDLE_TARGET" --debug && \
-    databricks bundle deploy --target "$BUNDLE_TARGET" --auto-approve --fail-on-active-runs --force-lock --debug
-
-  result="$?"
-  cd "$_pwd"
-  [ "$result" -ne "0" ] && err "[databricks_bundle_deploy|out]  => ${result}" && exit 1
-  info "[databricks_bundle_deploy|out] => ${result}"
-}
-
-############################
-#   name: databricks_bundle_destroy
-#   purpose: destroys all resources managed by a Databricks Asset Bundle in the specified target environment
-#   parameters: $1 (path to the bundle folder containing databricks.yml), $2 (deployment target: local | main, default: local)
-#   requires: databricks
-############################
-
-databricks_bundle_destroy(){
-  info "[databricks_bundle_destroy|in]"
-
-  [ -z $1 ] && err "[databricks_bundle_destroy] missing argument BUNDLE_FOLDER" && exit 1
-  local BUNDLE_FOLDER="$1"
-  local BUNDLE_TARGET="local"
-  [ ! -z $2 ] && BUNDLE_TARGET="$2"
-
-  [ "main" != "$BUNDLE_TARGET" ] && [ "local" != "$BUNDLE_TARGET" ] && err "[databricks_bundle_destroy] wrong argument BUNDLE_TARGET: $BUNDLE_TARGET" && exit 1
-  info "[databricks_bundle_destroy] BUNDLE_FOLDER: $BUNDLE_FOLDER   BUNDLE_TARGET: $BUNDLE_TARGET"
-
-  _pwd=`pwd`
-  cd "$BUNDLE_FOLDER"
-
-  databricks bundle destroy --target "$BUNDLE_TARGET" --auto-approve --force-lock --debug
-
-  result="$?"
-  cd "$_pwd"
-  [ "$result" -ne "0" ] && err "[databricks_bundle_destroy|out]  => ${result}" && exit 1
-  info "[databricks_bundle_destroy|out] => ${result}"
-}
-
-############################
-#   name: databricks_delete_secret
-#   purpose: removes a secret key from a Databricks secret scope
-#   parameters: $1 (secret key name), $2 (secret scope name)
-#   requires: databricks
-############################
-
-databricks_delete_secret(){
-  info "[databricks_delete_secret|in] ($1, $2)"
-
-  [ -z $1 ] && err "[databricks_delete_secret] missing argument SECRET_KEY" && exit 1
-  local SECRET_KEY="$1"
-  [ -z $2 ] && err "[databricks_delete_secret] missing argument SECRET_SCOPE" && exit 1
-  local SECRET_SCOPE="$2"
-
-  databricks secrets delete-secret $SECRET_SCOPE $SECRET_KEY
-  result="$?"
-
-  [ "$result" -ne "0" ] && err "[databricks_delete_secret|out] could not delete the secret" && exit 1
-  info "[databricks_delete_secret|out] => ${result}"
-}
-
-############################
-#   name: databricks_set_secret
-#   purpose: creates a secret in a Databricks secret scope if it does not already exist; warns if already present
-#   parameters: $1 (secret key name), $2 (secret scope name), $3 (secret string value)
-#   requires: databricks
-############################
-
-databricks_set_secret(){
-  info "[databricks_set_secret|in] ($1, $2, ${3:0:3})"
-
-  [ -z $1 ] && err "[databricks_set_secret] missing argument SECRET_KEY" && exit 1
-  local SECRET_KEY="$1"
-  [ -z $2 ] && err "[databricks_set_secret] missing argument SECRET_SCOPE" && exit 1
-  local SECRET_SCOPE="$2"
-  [ -z $3 ] && err "[databricks_set_secret] missing argument SECRET_VALUE" && exit 1
-  local SECRET_VALUE="$3"
-
-  query=$(databricks secrets get-secret $SECRET_SCOPE $SECRET_KEY)
-  if [ "$?" -ne "0" ]; then
-    info "[databricks_set_secret] creating secret $SECRET_KEY in scope $SECRET_SCOPE"
-    databricks secrets put-secret "$SECRET_SCOPE" "$SECRET_KEY" --string-value "$SECRET_VALUE"
-  else
-    warn "[databricks_set_secret] secret is already there"
-  fi
-  result="$?"
-  [ "$result" -ne "0" ] && err "[databricks_set_secret|out]  => ${result}" && exit 1
-  info "[databricks_set_secret|out] => ${result}"
-}
-
-
-############################
-#   name: get_azure_artifact
-#   purpose: downloads a universal package from an Azure DevOps artifacts feed using the Azure CLI
-#   parameters: $1 (Azure DevOps organization URL), $2 (feed name), $3 (package name),
-#               $4 (package version), $5 (local download path, default: current directory)
-#   requires: az (with azure-devops extension)
-############################
-
-get_azure_artifact(){
-  info "[get_azure_artifact|in] ($1, $2, $3, $4, $5)"
-
-  [ -z "$1" ] && err "[get_azure_artifact] missing argument ORGANIZATION" && exit 1
-  local ORGANIZATION="$1"
-  [ -z "$2" ] && err "[get_azure_artifact] missing argument FEED" && exit 1
-  local FEED="$2"
-  [ -z "$3" ] && err "[get_azure_artifact] missing argument NAME" && exit 1
-  local NAME="$3"
-  [ -z "$4" ] && err "[get_azure_artifact] missing argument VERSION" && exit 1
-  local VERSION="$4"
-
-  local TARGET="."
-  [ ! -z "$5" ] && TARGET="$5"
-  [ ! -d "$TARGET" ] && mkdir -p "$TARGET"
-
-  az artifacts universal download --organization "$ORGANIZATION" --feed "$FEED" --name "$NAME" --version "$VERSION" --path "$TARGET"
-  result="$?"
-
-  [ "$result" -ne "0" ] && err "[get_azure_artifact|out] => ${result}" && exit 1
-  info "[get_azure_artifact|out] => ${result}"
-}
-
-##########################################
-#######     ------- js -------     #######
-##########################################
-
-############################
-#   name: npm_deps
-#   purpose: runs 'npm install' in the specified project directory
-#   parameters: $1 (path to the directory containing package.json)
-#   requires: npm
-############################
-npm_deps(){
-  info "[npm_deps|in] ($1)"
-
-  [ -z $1 ] && err "[npm_deps] missing argument INFRA_DIR" && exit 1
-  local INFRA_DIR="$1"
-
-  _pwd=`pwd`
-  cd "$INFRA_DIR"
-
-  npm install
-
-  result="$?"
-  cd "$_pwd"
-  [ "$result" -ne "0" ] && err "[npm_deps|out]  => ${result}" && exit 1
-  info "[npm_deps|out] => ${result}"
-}
-
-############################
-#   name: npm_publish
-#   purpose: authenticates against a private npm registry and publishes the package as public
-#   parameters: $1 (registry hostname, e.g. npm.pkg.github.com), $2 (auth token), $3 (path to package folder)
-#   requires: npm
-############################
-
-npm_publish(){
-  info "[npm_publish|in] ($1, $2)"
-
-  [ -z $1 ] && err "[npm_publish] missing argument NPM_REGISTRY" && return 1
-  local registry="$1"
-  [ -z $2 ] && err "[npm_publish] missing argument NPM_TOKEN" && return 1
-  local token="$2"
-  [ -z $3 ] && err "[npm_publish] missing argument FOLDER" && return 1
-  local folder="$3"
-
-  _pwd=`pwd`
-  cd "$folder"
-  npm config set "//${registry}/:_authToken" "${token}"
-  npm publish . --access="public"
-  if [ ! "$?" -eq "0" ]; then err "[npm_publish] could not publish" && cd "$_pwd" && return 1; fi
-  cd "$_pwd"
-  info "[npm_publish] ...done."
-}
-
 ##########################################
 #######   ------- python -------   #######
 ##########################################
@@ -1952,59 +1470,531 @@ poetry_publish_pip(){
   [[ ! "$result" -eq "0" ]] && info "$msg" && exit 1
   info "$msg"
 }
-
 ##########################################
-####### ------- terraform -------  #######
+#######   ------- azure -------    #######
 ##########################################
 
 ############################
-#   name: terraform_autodeploy
-#   purpose: runs a full Terraform deployment (init → plan → apply --auto-approve) in the given folder
-#   parameters: $1 (path to the folder containing Terraform configuration files)
-#   requires: terraform
+#   name: az_sp_assign_subscription
+#   purpose: grants Contributor role to a service principal on the specified Azure subscription
+#   parameters: none
+#   requires: APP_ID (service principal app/client ID), ARM_SUBSCRIPTION_ID, az
 ############################
-terraform_autodeploy(){
-  info "[terraform_autodeploy] ..."
-
-  [ -z $1 ] && err "[terraform_autodeploy] missing function argument FOLDER" && return 1
-  local folder="$1"
-
-  verify_prereqs terraform
-  if [ ! "$?" -eq "0" ] ; then return 1; fi
-
-  _pwd=$(pwd)
-  cd "$folder"
-
-  terraform init
-  terraform plan
-  terraform apply -auto-approve -lock=true -lock-timeout=10m
-  if [ ! "$?" -eq "0" ]; then err "[terraform_autodeploy] could not apply" && cd "$_pwd" && return 1; fi
-  cd "$_pwd"
-  info "[terraform_autodeploy] ...done."
+az_sp_assign_subscription()
+{
+  info "[az_sp_assign_subscription|in]"
+  az role assignment create --assignee "${APP_ID}" --role "Contributor" --scope "/subscriptions/${ARM_SUBSCRIPTION_ID}"
+  info "[az_sp_assign_subscription|out]"
 }
 
 ############################
-#   name: terraform_autodestroy
-#   purpose: runs 'terraform destroy --auto-approve' in the given folder to tear down all managed infrastructure
-#   parameters: $1 (path to the folder containing Terraform configuration files)
-#   requires: terraform
+#   name: az_sp_login
+#   purpose: authenticates the Azure CLI using service principal credentials (non-interactive)
+#   parameters: none
+#   requires: APP_ID (client ID), ARM_CLIENT_SECRET, ARM_TENANT_ID, az
 ############################
 
-terraform_autodestroy(){
-  info "[terraform_autodestroy] ..."
-
-  [ -z $1 ] && err "[terraform_autodestroy] missing function argument FOLDER" && return 1
-  local folder="$1"
-
-  verify_prereqs terraform
-  if [ ! "$?" -eq "0" ] ; then return 1; fi
-
-  _pwd=$(pwd)
-  cd "$folder"
-
-  terraform destroy -auto-approve -lock=true -lock-timeout=10m
-  if [ ! "$?" -eq "0" ]; then err "[terraform_autodestroy] could not apply" && cd "$_pwd" && return 1; fi
-  cd "$_pwd"
-  info "[terraform_autodestroy] ...done."
+az_sp_login()
+{
+  info "[az_sp_login|in]"
+  az login --service-principal -u "${APP_ID}" -p "${ARM_CLIENT_SECRET}" --tenant "${ARM_TENANT_ID}" #--subscription "${ARM_SUBSCRIPTION_ID}"
+  info "[az_sp_login|out]"
 }
 
+############################
+#   name: az_login_check
+#   purpose: validates that the current Azure CLI session is active by performing a lightweight read-only API call
+#   parameters: none
+#   requires: az
+############################
+
+az_login_check()
+{
+  info "[az_login_check|in]"
+  az vm list-sizes --location westus
+  info "[az_login_check|out]"
+}
+
+############################
+#   name: az_logout
+#   purpose: signs out of the Azure CLI, clearing all cached credentials
+#   parameters: none
+#   requires: az
+############################
+
+az_logout()
+{
+  info "[az_logout|in]"
+  az logout
+  info "[az_logout|out]"
+}
+
+############################
+#   name: az_list_sp_roles
+#   purpose: lists all role assignments (principalName, role, scope) for a given service principal
+#   parameters: $1 (service principal app display name or object ID)
+#   requires: az
+############################
+
+az_list_sp_roles()
+{
+  info "[az_list_sp_roles|in] ($1)"
+
+  [ -z "$1" ] && err "no sp app display name provided" && exit 1
+  sp_app_name="$1"
+  az role assignment list --all --assignee "${sp_app_name}" --output json --query '[].{principalName:principalName, roleDefinitionName:roleDefinitionName, scope:scope}'
+
+  info "[az_list_sp_roles|out]"
+}
+
+############################
+#   name: az_storage_account_web_config
+#   purpose: enables static website hosting on an Azure Blob storage account (index: index.html, 404: 404.html),
+#            adds permissive CORS if not already configured, and stores the resulting website URL
+#            in the variables file via add_entry_to_variables
+#   parameters: $1 (storage account name), $2 (resource group name)
+#   requires: az, add_entry_to_variables
+############################
+
+az_storage_account_web_config(){
+  info "[az_storage_account_web_config|in] ($1, $2)"
+
+  [ -z "$1" ] && err "[az_storage_account_web_config] no STORAGE_ACCOUNT param provided" && exit 1
+  local STORAGE_ACCOUNT="$1"
+  [ -z "$2" ] && err "[az_storage_account_web_config] no resource group provided" && exit 1
+  local RESOURCE_GROUP="$2"
+
+  az storage blob service-properties update --account-name "$STORAGE_ACCOUNT" --static-website true \
+    --index-document "index.html" --404-document "404.html" #--debug --verbose 
+  result="$?"
+
+  if [ "$result" -eq "0" ]; then
+    cors_config=$(az storage cors list --account-name pvdi0textmining0website)
+    cors_result="$?"
+    info "[az_storage_account_web_config] cors_config result: $?"
+    info "[az_storage_account_web_config] cors_config: ->$cors_config<-"
+
+    if [[ "$cors_result" -eq "0" && "$cors_config" != "[]" ]]; then
+      warn "[az_storage_account_web_config] there is cors config already"
+    else
+      info "[az_storage_account_web_config] there is no cors config, goint to set it up"
+      az storage cors add --account-name "$STORAGE_ACCOUNT" --services b --methods GET --origins "*" --allowed-headers "*" --exposed-headers "*"
+      result="$?"
+    fi
+  fi
+
+  if [ "$result" -eq "0" ]; then
+    url=$(az storage account show --name "$STORAGE_ACCOUNT" --resource-group "$RESOURCE_GROUP" --query "primaryEndpoints.web" --output tsv) && \
+      add_entry_to_variables WEBSITE_URL "\"$url\""
+    result="$?"
+  fi
+
+  [ "$result" -ne "0" ] && err "[az_storage_account_web_config|out] could not configure bucket" && exit 1
+
+  info "[az_storage_account_web_config|out] => ${result}"
+}
+
+############################
+#   name: az_upload_static_website
+#   purpose: uploads all files from a local folder to the '$web' blob container of an Azure storage account (overwrites existing blobs)
+#   parameters: $1 (storage account name), $2 (local source folder path)
+#   requires: az
+############################
+
+az_upload_static_website(){
+  info "[az_upload_static_website|in] ($1, $2)"
+
+  [ -z "$1" ] && err "[az_upload_static_website] no STORAGE_ACCOUNT param provided" && exit 1
+  local STORAGE_ACCOUNT="$1"
+  [ -z "$2" ] && err "[az_upload_static_website] no SOURCE_FOLDER param provided" && exit 1
+  local SOURCE_FOLDER="$2"
+
+  az storage blob upload-batch --account-name $STORAGE_ACCOUNT --source $SOURCE_FOLDER --destination '$web' --debug --verbose --overwrite
+
+  result="$?"
+  [ "$result" -ne "0" ] && err "[az_upload_static_website|out] could not configure bucket" && exit 1
+
+  info "[az_upload_static_website|out] => ${result}"
+}
+
+############################
+#   name: get_azure_access_token
+#   purpose: obtains an OAuth2 access token from Azure AD using client credentials flow
+#            and persists it as AZURE_ACCESS_TOKEN in the secrets file via add_entry_to_secrets
+#   parameters: $1 (Azure tenant ID), $2 (client/app ID), $3 (client secret), $4 (OAuth2 scope, e.g. 'https://management.azure.com/.default')
+#   requires: curl, jq, add_entry_to_secrets
+############################
+
+get_azure_access_token(){
+  info "[get_azure_access_token|in] ($1, $2, ${3:0:3}, $4)"
+
+  [ -z $1 ] && err "[get_azure_access_token] missing argument TENANT_ID" && exit 1
+  TENANT_ID="$1"
+  [ -z $2 ] && err "[get_azure_access_token] missing argument BIFROST_CLIENT_ID" && exit 1
+  BIFROST_CLIENT_ID="$2"
+  [ -z $3 ] && err "[get_azure_access_token] missing argument APP_REG_CLIENT_SECRET" && exit 1
+  BIFROST_CLIENT_SECRET="$3"
+  [ -z $4 ] && err "[get_azure_access_token] missing argument SCOPE" && exit 1
+  SCOPE="$4"
+
+
+  local azure_token_api=https://login.microsoftonline.com/${TENANT_ID}/oauth2/v2.0/token
+
+  local response=$(curl -s -X POST "${azure_token_api}" -H "Content-Type: application/x-www-form-urlencoded" \
+      --data-urlencode "grant_type=client_credentials" \
+      --data-urlencode "client_id=${BIFROST_CLIENT_ID}" \
+      --data-urlencode "client_secret=${BIFROST_CLIENT_SECRET}" \
+      --data-urlencode "scope=${SCOPE}" )
+  result="$?"
+  access_token=$(echo "$response" | jq -r '.access_token')
+  add_entry_to_secrets "AZURE_ACCESS_TOKEN" "$access_token"
+
+  [ "$result" -ne "0" ] && err "[get_azure_access_token|out]  => ${result}" && exit 1
+  info "[get_azure_access_token|out] => ${access_token}"
+}
+##########################################
+####### ------- databricks ------- #######
+##########################################
+
+############################
+#   name: databricks_set_cli_access
+#   purpose: authenticates interactively with Azure, retrieves a Databricks access token,
+#            and persists DATABRICKS_HOST and DATABRICKS_TOKEN via add_entry_to_variables/add_entry_to_secrets
+#   parameters: $1 (Databricks workspace URL, e.g. https://<workspace>.azuredatabricks.net), $2 (Azure subscription ID)
+#   requires: az, add_entry_to_variables, add_entry_to_secrets
+############################
+databricks_set_cli_access()
+{
+  info "[databricks_set_cli_access|in] ($1, $2)"
+  [ -z "$2" ] && err "no subscription Id provided" && return 1
+  [ -z "$1" ] && err "no workspace url provided" && return 1
+
+  # dd62d6ec-d618-49ad-bd43-04a2ef12c0fb
+
+  az login
+  az account set --subscription "$2"
+  token=$(az account get-access-token --resource 2ff814a6-3304-4ab8-85cb-cd0e6f879c1d --query "accessToken" --output tsv)
+  add_entry_to_variables DATABRICKS_HOST "$1"
+  add_entry_to_secrets DATABRICKS_TOKEN "$token"
+  info "[databricks_set_cli_access|out]"
+}
+
+############################
+#   name: databricks_bundle_deploy
+#   purpose: validates and deploys a Databricks Asset Bundle to the specified target environment
+#   parameters: $1 (path to the bundle folder containing databricks.yml), $2 (deployment target: local | main, default: local)
+#   requires: databricks
+############################
+
+databricks_bundle_deploy(){
+  info "[databricks_bundle_deploy|in]"
+
+  [ -z $1 ] && err "[databricks_bundle_deploy] missing argument BUNDLE_FOLDER" && exit 1
+  local BUNDLE_FOLDER="$1"
+  local BUNDLE_TARGET="local"
+  [ ! -z $2 ] && BUNDLE_TARGET="$2"
+
+  [ "main" != "$BUNDLE_TARGET" ] && [ "local" != "$BUNDLE_TARGET" ] && err "[databricks_bundle_deploy] wrong argument BUNDLE_TARGET: $BUNDLE_TARGET" && exit 1
+  info "[databricks_bundle_deploy] BUNDLE_FOLDER: $BUNDLE_FOLDER   BUNDLE_TARGET: $BUNDLE_TARGET"
+
+  _pwd=`pwd`
+  cd "$BUNDLE_FOLDER"
+
+  databricks bundle validate --target "$BUNDLE_TARGET" --debug && \
+    databricks bundle deploy --target "$BUNDLE_TARGET" --auto-approve --fail-on-active-runs --force-lock --debug
+
+  result="$?"
+  cd "$_pwd"
+  [ "$result" -ne "0" ] && err "[databricks_bundle_deploy|out]  => ${result}" && exit 1
+  info "[databricks_bundle_deploy|out] => ${result}"
+}
+
+############################
+#   name: databricks_bundle_destroy
+#   purpose: destroys all resources managed by a Databricks Asset Bundle in the specified target environment
+#   parameters: $1 (path to the bundle folder containing databricks.yml), $2 (deployment target: local | main, default: local)
+#   requires: databricks
+############################
+
+databricks_bundle_destroy(){
+  info "[databricks_bundle_destroy|in]"
+
+  [ -z $1 ] && err "[databricks_bundle_destroy] missing argument BUNDLE_FOLDER" && exit 1
+  local BUNDLE_FOLDER="$1"
+  local BUNDLE_TARGET="local"
+  [ ! -z $2 ] && BUNDLE_TARGET="$2"
+
+  [ "main" != "$BUNDLE_TARGET" ] && [ "local" != "$BUNDLE_TARGET" ] && err "[databricks_bundle_destroy] wrong argument BUNDLE_TARGET: $BUNDLE_TARGET" && exit 1
+  info "[databricks_bundle_destroy] BUNDLE_FOLDER: $BUNDLE_FOLDER   BUNDLE_TARGET: $BUNDLE_TARGET"
+
+  _pwd=`pwd`
+  cd "$BUNDLE_FOLDER"
+
+  databricks bundle destroy --target "$BUNDLE_TARGET" --auto-approve --force-lock --debug
+
+  result="$?"
+  cd "$_pwd"
+  [ "$result" -ne "0" ] && err "[databricks_bundle_destroy|out]  => ${result}" && exit 1
+  info "[databricks_bundle_destroy|out] => ${result}"
+}
+
+############################
+#   name: databricks_delete_secret
+#   purpose: removes a secret key from a Databricks secret scope
+#   parameters: $1 (secret key name), $2 (secret scope name)
+#   requires: databricks
+############################
+
+databricks_delete_secret(){
+  info "[databricks_delete_secret|in] ($1, $2)"
+
+  [ -z $1 ] && err "[databricks_delete_secret] missing argument SECRET_KEY" && exit 1
+  local SECRET_KEY="$1"
+  [ -z $2 ] && err "[databricks_delete_secret] missing argument SECRET_SCOPE" && exit 1
+  local SECRET_SCOPE="$2"
+
+  databricks secrets delete-secret $SECRET_SCOPE $SECRET_KEY
+  result="$?"
+
+  [ "$result" -ne "0" ] && err "[databricks_delete_secret|out] could not delete the secret" && exit 1
+  info "[databricks_delete_secret|out] => ${result}"
+}
+
+############################
+#   name: databricks_set_secret
+#   purpose: creates a secret in a Databricks secret scope if it does not already exist; warns if already present
+#   parameters: $1 (secret key name), $2 (secret scope name), $3 (secret string value)
+#   requires: databricks
+############################
+
+databricks_set_secret(){
+  info "[databricks_set_secret|in] ($1, $2, ${3:0:3})"
+
+  [ -z $1 ] && err "[databricks_set_secret] missing argument SECRET_KEY" && exit 1
+  local SECRET_KEY="$1"
+  [ -z $2 ] && err "[databricks_set_secret] missing argument SECRET_SCOPE" && exit 1
+  local SECRET_SCOPE="$2"
+  [ -z $3 ] && err "[databricks_set_secret] missing argument SECRET_VALUE" && exit 1
+  local SECRET_VALUE="$3"
+
+  query=$(databricks secrets get-secret $SECRET_SCOPE $SECRET_KEY)
+  if [ "$?" -ne "0" ]; then
+    info "[databricks_set_secret] creating secret $SECRET_KEY in scope $SECRET_SCOPE"
+    databricks secrets put-secret "$SECRET_SCOPE" "$SECRET_KEY" --string-value "$SECRET_VALUE"
+  else
+    warn "[databricks_set_secret] secret is already there"
+  fi
+  result="$?"
+  [ "$result" -ne "0" ] && err "[databricks_set_secret|out]  => ${result}" && exit 1
+  info "[databricks_set_secret|out] => ${result}"
+}
+
+
+############################
+#   name: get_azure_artifact
+#   purpose: downloads a universal package from an Azure DevOps artifacts feed using the Azure CLI
+#   parameters: $1 (Azure DevOps organization URL), $2 (feed name), $3 (package name),
+#               $4 (package version), $5 (local download path, default: current directory)
+#   requires: az (with azure-devops extension)
+############################
+
+get_azure_artifact(){
+  info "[get_azure_artifact|in] ($1, $2, $3, $4, $5)"
+
+  [ -z "$1" ] && err "[get_azure_artifact] missing argument ORGANIZATION" && exit 1
+  local ORGANIZATION="$1"
+  [ -z "$2" ] && err "[get_azure_artifact] missing argument FEED" && exit 1
+  local FEED="$2"
+  [ -z "$3" ] && err "[get_azure_artifact] missing argument NAME" && exit 1
+  local NAME="$3"
+  [ -z "$4" ] && err "[get_azure_artifact] missing argument VERSION" && exit 1
+  local VERSION="$4"
+
+  local TARGET="."
+  [ ! -z "$5" ] && TARGET="$5"
+  [ ! -d "$TARGET" ] && mkdir -p "$TARGET"
+
+  az artifacts universal download --organization "$ORGANIZATION" --feed "$FEED" --name "$NAME" --version "$VERSION" --path "$TARGET"
+  result="$?"
+
+  [ "$result" -ne "0" ] && err "[get_azure_artifact|out] => ${result}" && exit 1
+  info "[get_azure_artifact|out] => ${result}"
+}
+##########################################
+#######  ------- assorted -------  #######
+##########################################
+
+############################
+#   name: test_js_lambda
+#   purpose: installs npm dependencies and runs Jest tests for a JavaScript Lambda function
+#   parameters: $1 (path to the Lambda function directory containing package.json)
+#   requires: npm, jest
+############################
+test_js_lambda(){
+  info "[test_js_lambda|in] ({$1})"
+
+  [ -z $1 ] && err "[get_cloudfront_cidr] missing argument FUNCTION_DIR" && exit 1
+  local FUNCTION_DIR="$1"
+  _pwd=`pwd`
+  cd "$FUNCTION_DIR"
+
+  npm install
+  jest
+
+  result="$?"
+  cd "$_pwd"
+  [ "$result" -ne "0" ] && err "[test_js_lambda|out]  => ${result}" && exit 1
+  info "[test_js_lambda|out] => ${result}"
+}
+
+############################
+#   name: zip_js_lambda_function
+#   purpose: packages a JavaScript Lambda function into a zip archive;
+#            installs npm dependencies if package.json is present and removes the bundled aws-sdk
+#            (provided by the Lambda runtime) to reduce bundle size
+#   parameters: $1 (source directory), $2 (output zip file path), $3+ (files/folders to include in the zip)
+#   requires: npm, zip
+############################
+
+zip_js_lambda_function(){
+  info "[zip_js_lambda_function] ...( $@ )"
+  local usage_msg=$'zip_js_lambda_function: zips a js lambda function:\nusage:\n    zip_js_lambda_function SRC_DIR ZIP_FILE { FILES FOLDERS ... }'
+
+  verify_prereqs npm
+  if [ ! "$?" -eq "0" ] ; then return 1; fi
+
+  if [ -z "$3" ] ; then echo "$usage_msg" && return 1; fi
+
+  local src_dir="$1"
+  local zip_file="$2"
+  local files="${@:3}"
+  local AWS_SDK_MODULE_PATH=$src_dir/node_modules/aws-sdk
+
+  _pwd=`pwd`
+  cd "$src_dir"
+
+  if [ -f "package.json" ]; then
+    npm install &>/dev/null
+    if [ ! "$?" -eq "0" ] ; then err "[zip_js_lambda_function] could not install dependencies" && cd "$_pwd" && return 1; fi
+    if [ -d "${AWS_SDK_MODULE_PATH}" ]; then rm -r "$AWS_SDK_MODULE_PATH"; fi
+  fi
+
+  rm -f "$zip_file"
+  zip -9 -q -r "$zip_file" "$files" &>/dev/null
+  if [ ! "$?" -eq "0" ] ; then err "[zip_js_lambda_function] could not zip it" && cd "$_pwd" && return 1; fi
+
+  cd "$_pwd"
+  info "[zip_js_lambda_function] ...done."
+}
+
+############################
+#   name: get_function_release
+#   purpose: downloads a named artifact from the latest GitHub release of a repository into this_folder
+#   parameters: $1 (GitHub repository in 'owner/repo' format), $2 (artifact filename to match)
+#   requires: curl, wget, this_folder
+############################
+
+get_function_release(){
+  info "[get_function_release] ...( $@ )"
+  local usage_msg=$'get_function_release: retrieves a function release artifact from github:\nusage:\n    get_function_release REPO ARTIFACT'
+
+  if [ -z "$2" ] ; then echo "$usage_msg" && return 1; fi
+  local repo="$1"
+  local artifact="$2"
+
+  _pwd=`pwd`
+  cd "$this_folder"
+
+  curl -s "https://api.github.com/repos/${repo}/releases/latest" \
+  | grep "browser_download_url.*${artifact}" \
+  | cut -d '"' -f 4 | wget -qi -
+
+  cd "$_pwd"
+  info "[get_function_release] ...done."
+}
+
+############################
+#   name: download_function
+#   purpose: downloads a named artifact from the latest GitHub release of a repository and saves it to a specific local file
+#   parameters: $1 (GitHub repository in 'owner/repo' format), $2 (artifact filename to match), $3 (local destination file path)
+#   requires: curl, wget
+############################
+
+download_function(){
+  info "[download_function|in] ...( $@ )"
+  local usage_msg=$'download_function: downloads a function release artifact from github:\nusage:\n    download_function REPO ARTIFACT DESTINATION_FILE'
+
+  if [ -z "$3" ] ; then echo "$usage_msg" && return 1; fi
+  local repo="$1"
+  local artifact="$2"
+  local file="$3"
+
+  curl -s "https://api.github.com/repos/${repo}/releases/latest" \
+  | grep "browser_download_url.*${artifact}" \
+  | cut -d '"' -f 4 | wget -O "$file" -qi  -
+  if [ ! "$?" -eq "0" ]; then err "[download_function] curl command was not successful" && return 1; fi
+
+  info "[download_function|out] ...done."
+}
+
+############################
+#   name: call_grafana_api
+#   purpose: makes an authenticated GET request to a Grafana API endpoint through a proxy/gateway,
+#            passing both an Azure bearer token and a Grafana service account token
+#   parameters: $1 (Azure OAuth2 access token), $2 (Grafana service account API token)
+#   requires: curl
+############################
+
+call_grafana_api(){
+  info "[call_grafana_api|in] (${1:0:3}, ${2:0:3})"
+
+  [ -z $1 ] && err "[call_grafana_api] missing argument AZURE_ACCESS_TOKEN" && exit 1
+  AZURE_ACCESS_TOKEN="$1"
+  [ -z $2 ] && err "[call_grafana_api] missing argument GRAFANA_API_TOKEN" && exit 1
+  GRAFANA_API_TOKEN="$2"
+
+  local response=$(curl -s -X GET "https://api.bifrost.heimdall.novonordisk.cloud/grafana/api/org"  \
+      -H "Authorization: Bearer ${AZURE_ACCESS_TOKEN}" \
+      -H "X-Bifrost-Grafana-SA: Bearer ${GRAFANA_API_TOKEN}" )
+  result="$?"
+
+  [ "$result" -ne "0" ] && err "[call_grafana_api|out]  => ${result}" && exit 1
+  info "[call_grafana_api|out] => ${response}"
+}
+##########################################
+#######  ------- commons -------   #######
+##########################################
+
+############################
+#   name: commands
+#   purpose: prints a quick-reference cheat sheet of commonly used commands covering:
+#            Python virtualenv/Jupyter, AWS CDK (TypeScript), AWS CLI, and git configuration
+#   parameters: none
+############################
+commands() {
+  cat <<EOM
+
+  handy commands:
+
+  python -m venv .venv                                             create virtual environment
+  jupyter-notebook --log-level=40 --no-browser                            starts jupyter server
+  cdk init app --language typescript                                      create new cdk app on typescript
+  npm run build                                                           compile typescript to js
+  npm run watch                                                           watch for changes and compile
+  npm run test                                                            perform the jest unit tests
+  git config user.email "$JTV_GITHUB_EMAIL"                               set local git config email
+  aws-cdk
+    cdk init app --language typescript                                    create new cdk app on typescript
+    cdk deploy                                                            deploy this stack to your default AWS account/region
+    cdk diff                                                              compare deployed stack with current state
+    cdk synth                                                             emits the synthesized CloudFormation template
+  aws
+    aws cloudformation delete-stack --stack-name <STACKNAME>              delete stack to later recreate with bootstrap (see https://stackoverflow.com/questions/71280758/aws-cdk-bootstrap-itself-broken/71283964#71283964)
+    aws configure sso --profile nn --no-browser                           configure sso
+    export AWS_PROFILE=nn                                                 set current environment profile
+    aws sts get-caller-identity                                           check current session
+    aws sts get-caller-identity --profile <PROFILE>                       display session profile info
+    aws lambda invoke --function-name FUNCTION_NAME out --log-type Tail 
+
+EOM
+}

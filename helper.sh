@@ -162,18 +162,34 @@ build_bashutils(){
   info "[build_bashutils|in]"
   local sections_dir="$this_folder/sections"
   local out_file="$this_folder/$INCLUDE_FILE"
+  local sections_order_file="$this_folder/sections.order"
+  local tmp_file
+  local section
+  local section_file
+  local last_char
 
   [ ! -d "$sections_dir" ] && err "[build_bashutils] sections folder not found: $sections_dir" && return 1
+  [ ! -f "$sections_order_file" ] && err "[build_bashutils] sections order file not found: $sections_order_file" && return 1
 
-  local files
-  files=("$sections_dir"/*.sh)
-  [ ${#files[@]} -eq 0 ] && err "[build_bashutils] no .sh files found in $sections_dir" && return 1
+  tmp_file="$(mktemp)" || return 1
+  trap 'rm -f "$tmp_file"' RETURN
 
-  > "$out_file"
-  for f in "${files[@]}"; do
-    cat "$f" >> "$out_file"
-    echo >> "$out_file"
-  done
+  while IFS= read -r section || [ -n "$section" ]; do
+    section="${section%%#*}"
+    section="${section#"${section%%[![:space:]]*}"}"
+    section="${section%"${section##*[![:space:]]}"}"
+
+    [ -z "$section" ] && continue
+
+    section_file="$sections_dir/$section"
+    [ ! -f "$section_file" ] && err "[build_bashutils] section file not found: $section_file" && return 1
+
+    cat "$section_file" >> "$tmp_file" || return 1
+    last_char="$(tail -c 1 "$section_file")"
+    [ -n "$last_char" ] && echo >> "$tmp_file"
+  done < "$sections_order_file"
+
+  mv "$tmp_file" "$out_file" || return 1
 
   local result="$?"
   local msg="[build_bashutils|out] => ${result}"
@@ -193,7 +209,7 @@ usage() {
   $(basename "$0") { option }
     options:
       - hello_world        says hello to the world
-      - build_bashutils    rebuild .bashutils by concatenating all files in sections/
+      - build_bashutils    rebuild .bashutils using explicit section order in sections.order
 EOM
   exit 1
 }
@@ -214,4 +230,3 @@ case "$1" in
 esac
 
 # <=== FOOTER SECTION END  <===
-
