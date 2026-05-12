@@ -42,7 +42,7 @@ verify_env(){
   for arg in "$@"
   do
       debug "[verify_env] ... checking $arg"
-      if [ -z "$arg" ]; then err "[verify_env] please define env var: $arg" && return 1; fi
+      if [ -z "${!arg}" ]; then err "[verify_env] please define env var: $arg" && return 1; fi
   done
   info "[verify_env] ...done."
 }
