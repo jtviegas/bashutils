@@ -127,7 +127,11 @@ download_bashutils_if_newer() {
   else
     asset_name="$(basename "$BASHUTILS_RELEASE_ASSET_URL")"
     release_json="$(curl -fsSL -H "User-Agent: bashutils-template" "$BASHUTILS_RELEASE_API_URL" 2>/dev/null)"
-    expected_sha256="$(printf '%s' "$release_json" | tr '{' '\n' | grep "\"name\":\"$asset_name\"" | sed -n 's/.*"digest":"sha256:\([a-f0-9]\{64\}\)".*/\1/p' | head -n 1)"
+    if command -v jq >/dev/null 2>&1; then
+      expected_sha256="$(printf '%s' "$release_json" | jq -r --arg asset_name "$asset_name" '.assets[] | select(.name == $asset_name) | .digest' 2>/dev/null | sed -n 's/^sha256:\([a-f0-9]\{64\}\)$/\1/p' | head -n 1)"
+    else
+      expected_sha256="$(printf '%s' "$release_json" | tr '{' '\n' | grep "\"name\":\"$asset_name\"" | sed -n 's/.*"digest":"sha256:\([a-f0-9]\{64\}\)".*/\1/p' | head -n 1)"
+    fi
     if [ -n "$expected_sha256" ]; then
       if ! command -v tar >/dev/null 2>&1; then
         err "[download_bashutils_if_newer] please install tar with bzip2 support"
@@ -155,13 +159,13 @@ download_bashutils_if_newer() {
         return 1
       fi
       if ! tar -xjf "$bashutils_archive_tmp" "$INCLUDE_FILE" -O > "$bashutils_tmp"; then
-        err "[download_bashutils_if_newer] failed to extract $INCLUDE_FILE from release asset"
+        err "[download_bashutils_if_newer] failed to extract $INCLUDE_FILE from release asset (archive may be corrupted or tar lacks bzip2 support)"
         rm -f "$bashutils_tmp" "$bashutils_archive_tmp"
         return 1
       fi
       rm -f "$bashutils_archive_tmp"
     else
-      warn "[download_bashutils_if_newer] failed to resolve latest release checksum, using bootstrap artifact"
+      warn "[download_bashutils_if_newer] failed to resolve latest release checksum (API unavailable or malformed response), using bootstrap artifact"
       download_url="$BASHUTILS_BOOTSTRAP_URL"
       expected_sha256="$BASHUTILS_BOOTSTRAP_SHA256"
       if [ -z "$expected_sha256" ]; then
