@@ -36,11 +36,17 @@ jobs:
           test -f .github/agents/agent-pr-review.agent.md || { echo "Missing agent definition: .github/agents/agent-pr-review.agent.md"; exit 1; }
 
           review_prompt="Review the changes in this PR and provide feedback"
+          stderr_log="$(mktemp)"
 
-          copilot -i "/agent agent-pr-review \"${review_prompt}\"" > review_output.md 2> >(tee /dev/stdout) || {
-            echo "Copilot agent review failed."
-            exit 1
+          copilot -i "/agent agent-pr-review \"${review_prompt}\"" > review_output.md 2>"${stderr_log}" || {
+            rc=$?
+            echo "Copilot agent review failed with exit code ${rc}. Captured stderr:"
+            sed -n '1,200p' "${stderr_log}"
+            rm -f "${stderr_log}"
+            exit "${rc}"
           }
+
+          rm -f "${stderr_log}"
 
           test -s review_output.md || {
             echo "Review output file is empty or could not be read"
