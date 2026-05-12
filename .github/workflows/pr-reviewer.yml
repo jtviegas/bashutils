@@ -28,15 +28,15 @@ jobs:
       - name: Run Agent Review
         id: agent-review
         env:
-          COPILOT_AGENT_TOKEN: ${{ secrets.COPILOT_AGENT_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          : "${COPILOT_AGENT_TOKEN:?COPILOT_AGENT_TOKEN secret is required}"
+          : "${GITHUB_TOKEN:?GITHUB_TOKEN secret is required}"
           test -f .github/agents/agent-pr-review.agent.md || { echo "Missing agent definition: .github/agents/agent-pr-review.agent.md"; exit 1; }
 
           review_prompt="Review the changes in this PR and provide feedback"
 
-          GITHUB_TOKEN="$COPILOT_AGENT_TOKEN" copilot /agent agent-pr-review "$review_prompt" > review_output.md 2> review_error.log || {
+          copilot /agent agent-pr-review "$review_prompt" > review_output.md 2> review_error.log || {
             cat review_error.log
             exit 1
           }
