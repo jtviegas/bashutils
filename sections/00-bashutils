@@ -1,0 +1,1905 @@
+##########################################
+#######    ------- bash -------    #######
+##########################################
+
+############################
+#   name: contains
+#   purpose: checks if a list contains a specific item
+#   parameters: $1 (list), $2 (item to find)
+############################
+# contains <list> <item>
+# echo $? # 0： match, 1: failed
+contains() {
+    [[ $1 =~ (^|[[:space:]])$2($|[[:space:]]) ]] && return 0 || return 1
+}
+
+############################
+#   name: verify_prereqs
+#   purpose: verifies that required prerequisite commands are installed
+#   parameters: $@ (list of required commands)
+############################
+verify_prereqs(){
+  info "[verify_prereqs] ..."
+  for arg in "$@"
+  do
+      debug "[verify_prereqs] ... checking $arg"
+      which "$arg" 1>/dev/null
+      if [ ! "$?" -eq "0" ] ; then err "[verify_prereqs] please install $arg" && return 1; fi
+  done
+  info "[verify_prereqs] ...done."
+}
+
+############################
+#   name: verify_env
+#   purpose: verifies that required environment variables are defined
+#   parameters: $@ (list of environment variable names)
+############################
+verify_env(){
+  info "[verify_env] ..."
+  for arg in "$@"
+  do
+      debug "[verify_env] ... checking $arg"
+      if [ -z "$arg" ]; then err "[verify_env] please define env var: $arg" && return 1; fi
+  done
+  info "[verify_env] ...done."
+}
+
+############################
+#   name: package
+#   purpose: creates a tar archive of specified files
+#   parameters: uses global vars TAR_NAME and INCLUDE_FILE
+############################
+package(){
+  info "[package] ..."
+  _pwd=`pwd`
+  cd "$this_folder"
+
+  tar cjpvf "$TAR_NAME" "$INCLUDE_FILE"
+  if [ ! "$?" -eq "0" ] ; then err "[package] could not tar it" && cd "$_pwd" && return 1; fi
+
+  cd "$_pwd"
+  info "[package] ...done."
+}
+
+############################
+#   name: create_from_template_and_envvars
+#   purpose: creates a file from a template by substituting environment variables
+#   parameters: $1 (template file), $2 (destination file), $3+ (environment variable names)
+############################
+create_from_template_and_envvars() {
+  info "[create_from_template_and_envvars] ...( $@ )"
+  local usage_msg=$'create_from_template_and_envvars: creates a file from a template substituting env vars:\nusage:\n    create_from_template_and_envvars TEMPLATE DESTINATION [ENVVARS...]'
+
+  if [ -z "$3" ] ; then echo "$usage_msg" && return 1; fi
+
+  local template="$1"
+  local destination="$2"
+  local vars="${@:3}"
+
+  local expression=""
+  for var in $vars
+  do
+    eval val=\${"$var"}
+    #echo "$var: $val"
+    expression="${expression}s/${var}/${val}/g;"
+  done
+
+  #echo "expression: $expression"
+  sed "${expression}" "$template" > "$destination"
+  if [ ! "$?" -eq "0" ]; then err "[create_from_template_and_envvars] sed command was not successful" && return 1; fi
+  info "[create_from_template_and_envvars] ...done."
+}
+
+############################
+#   name: add_entry_to_file
+#   purpose: adds or updates an environment variable entry in a file
+#   parameters: $1 (file name), $2 (variable name), $3 (variable value)
+############################
+add_entry_to_file()
+{
+  info "[add_entry_to_file|in] ($1, $2, ${3:0:5})"
+  [ -z "$2" ] && err "no parameters provided" && return 1
+  local file="$1"
+  local file_path="${this_folder}/${file}"
+  local var_name="$2"
+  local var_value="$3"
+
+  if [ -f "$file_path" ]; then
+    if [[ "$OSTYPE" == "darwin"* ]]; then
+      sed -i '' "/export $var_name=/d" "$file_path"
+    else
+      sed -i "/$var_name=/c\\" "$file_path"
+    fi
+
+    if [ ! -z "$var_value" ]; then
+      echo "export $var_name=$var_value" | tee -a "$file_path" > /dev/null
+    fi
+  fi
+  info "[add_entry_to_file|out]"
+}
+
+############################
+#   name: add_entry_to_variables
+#   purpose: adds an environment variable entry to the variables file
+#   parameters: $1 (variable name), $2 (variable value)
+############################
+add_entry_to_variables()
+{
+  info "[add_entry_to_variables|in] ($1, $2)"
+  [ -z "$1" ] && err "no parameters provided" && return 1
+
+  target_file="${FILE_VARIABLES}"
+  add_entry_to_file "$target_file" "$1" "$2" 
+
+  info "[add_entry_to_variables|out]"
+}
+
+############################
+#   name: add_entry_to_local_variables
+#   purpose: adds an environment variable entry to the local variables file
+#   parameters: $1 (variable name), $2 (variable value)
+############################
+add_entry_to_local_variables()
+{
+  info "[add_entry_to_local_variables|in] ($1, $2)"
+  [ -z "$1" ] && err "no parameters provided" && return 1
+
+  target_file="${FILE_LOCAL_VARIABLES}"
+  add_entry_to_file "$target_file" "$1" "$2" 
+
+  info "[add_entry_to_local_variables|out]"
+}
+
+############################
+#   name: add_entry_to_secrets
+#   purpose: adds an environment variable entry to the secrets file
+#   parameters: $1 (variable name), $2 (variable value)
+############################
+add_entry_to_secrets()
+{
+  info "[add_entry_to_secrets|in] ($1, ${2:0:7})"
+  [ -z "$1" ] && err "no parameters provided" && return 1
+
+  target_file="${FILE_SECRETS}"
+  add_entry_to_file "$target_file" "$1" "$2" 
+
+  info "[add_entry_to_secrets|out]"
+}
+
+############################
+#   name: git_tag_and_push
+#   purpose: creates a git tag and pushes it to remote repository
+#   parameters: $1 (version), $2 (commit hash)
+############################
+git_tag_and_push()
+{
+  info "[git_tag_and_push|in] ($1, ${2:0:7})"
+
+  [ -z "$1" ] && err "must provide parameter VERSION" && exit 1
+  local VERSION="$1"
+  [ -z "$2" ] && err "must provide parameter COMMIT_HASH" && exit 1
+  local COMMIT_HASH="$2"
+
+  git tag -a "$VERSION" "$COMMIT_HASH" -m "release $VERSION" && git push --tags
+  result="$?"
+  [ "$result" -ne "0" ] && err "[git_tag_and_push|out] could not tag and push" && exit 1
+
+  info "[git_tag_and_push|out] => ${result}"
+}
+
+############################
+#   name: get_latest_tag
+#   purpose: retrieves the latest git tag from the repository
+#   parameters: none
+############################
+get_latest_tag() {
+  info "[get_latest_tag|in]"
+  git fetch --tags > /dev/null 2>&1
+  latest_tag=$(git describe --tags --abbrev=0 2>/dev/null)
+  local result=0
+  if [ ! -z "$latest_tag" ]; then
+      result="$latest_tag"
+  fi
+  info "[get_latest_tag|out] => ${result}"
+}
+
+############################
+#   name: changelog
+#   purpose: creates a changelog file from git commit history
+#   parameters: $1 (optional filename, default: CHANGELOG)
+############################
+
+changelog(){
+  info "[changelog|in] ($1)"
+
+  local FILE="CHANGELOG"
+  [ ! -z $1 ] && FILE="$1"
+  info "[changelog] creating file: $FILE"
+
+  _pwd=`pwd`
+  cd "$this_folder"
+
+  git log --pretty=format:"- %h %as %d %s" > "$FILE"
+  result="$?"
+
+  cd "$_pwd"
+  [ "$result" -ne "0" ] && err "[changelog|out]  => ${result}" && exit 1
+  echo "[changelog|out] => $result"
+}
+
+############################
+#   name: proj_code_transfer
+#   purpose: transfers code between projects with path and import replacements
+#   parameters: $1 (tmp folder), $2 (folders), $3 (origin path), $4 (target path), $5 (origin import), $6 (target import)
+############################
+
+proj_code_transfer(){
+  info "[proj_code_transfer|in] ($1)"
+
+  # example:
+  # export CODE_TRANSFER_FOLDERS="src tests"
+  # export CODE_TRANSFER_PATH_REPLACEMENT_ORIGIN="ssds_qsd_dataops"
+  # export CODE_TRANSFER_PATH_REPLACEMENT_TARGET="tgedr/dataops"
+
+  # export CODE_TRANSFER_IMPORT_REPLACEMENT_ORIGIN="ssds_qsd_dataops."
+  # export CODE_TRANSFER_IMPORT_REPLACEMENT_TARGET="tgedr.dataops."
+
+  [ -z $1 ] && err "[proj_code_transfer] missing argument TMP_FOLDER" && exit 1
+  local TMP_FOLDER="$1"
+  [ -z $2 ] && err "[proj_code_transfer] missing argument CODE_TRANSFER_FOLDERS" && exit 1
+  local CODE_TRANSFER_FOLDERS="$2"
+  [ -z $3 ] && err "[proj_code_transfer] missing argument CODE_TRANSFER_PATH_REPLACEMENT_ORIGIN" && exit 1
+  local CODE_TRANSFER_PATH_REPLACEMENT_ORIGIN="$3"
+  [ -z $4 ] && err "[proj_code_transfer] missing argument CODE_TRANSFER_PATH_REPLACEMENT_TARGET" && exit 1
+  local CODE_TRANSFER_PATH_REPLACEMENT_TARGET="$4"
+  [ -z $5 ] && err "[proj_code_transfer] missing argument CODE_TRANSFER_IMPORT_REPLACEMENT_ORIGIN" && exit 1
+  local CODE_TRANSFER_IMPORT_REPLACEMENT_ORIGIN="$5"
+  [ -z $6 ] && err "[proj_code_transfer] missing argument CODE_TRANSFER_IMPORT_REPLACEMENT_TARGET" && exit 1
+  local CODE_TRANSFER_IMPORT_REPLACEMENT_TARGET="$6"
+
+
+
+   _pwd=`pwd`
+  cd "$this_folder"
+
+  [[ ! -d "$TMP_FOLDER" ]] && mkdir -p "$TMP_FOLDER"
+
+  for item in "${CODE_TRANSFER_FOLDERS[@]}"; do
+    info "[proj_code_transfer] checking: $item"
+    find ./$item -type f | while read -r filepath; do
+
+    if [[ "$filepath" != *"__"* ]]; then
+        info "[proj_code_transfer] file: $filepath"
+        new_filepath=${filepath//$CODE_TRANSFER_PATH_REPLACEMENT_ORIGIN/$CODE_TRANSFER_PATH_REPLACEMENT_TARGET}
+        info "[proj_code_transfer] copying it to: $TMP_FOLDER/$new_filepath"
+        mkdir -p "$(dirname $TMP_FOLDER/$new_filepath)"
+        cp "$filepath" "$TMP_FOLDER/$new_filepath"
+        sed -i "" "s/import $CODE_TRANSFER_IMPORT_REPLACEMENT_ORIGIN/import $CODE_TRANSFER_IMPORT_REPLACEMENT_TARGET/g" "$TMP_FOLDER/$new_filepath"
+        sed -i "" "s/from $CODE_TRANSFER_IMPORT_REPLACEMENT_ORIGIN/from $CODE_TRANSFER_IMPORT_REPLACEMENT_TARGET/g" "$TMP_FOLDER/$new_filepath"
+    fi
+    done
+  done
+
+  local result="$?"
+  cd "$_pwd"
+  local msg="[proj_code_transfer|out] => ${result}"
+  [[ ! "$result" -eq "0" ]] && info "$msg" && exit 1
+  info "$msg"
+}
+
+############################
+#   name: add_pypi_config
+#   purpose: adds PyPI configuration file with provided token
+#   parameters: $1 (PyPI token)
+############################
+
+add_pypi_config(){
+  info "[add_pypi_config] ..."
+
+  [ -z $1 ] && err "[add_pypi_config] missing argument PYPI_TOKEN" && exit 1
+  local PYPI_TOKEN="$1"
+  
+  _pwd=`pwd`
+  cd ~/
+
+  if [ ! -f ".pypirc" ]; then
+    info "[add_pypi_config] no '.pypirc' going to create it"
+    echo "[pypi]" > .pypirc
+    echo "username = __token__" >> .pypirc
+    echo "password = $PYPI_TOKEN" >> .pypirc
+  fi
+  cd "$_pwd"
+  info "[add_pypi_config] ...done."
+}
+
+############################
+#   name: assert_uv_config
+#   purpose: assures that last version of 'uv' is present in the system
+############################
+
+assert_uv_config(){
+  info "[assert_uv_config|in]"
+
+  which uv 1>/dev/null
+  if [ "$?" -ne "0" ]; then 
+    curl -LsSf https://astral.sh/uv/install.sh | sh
+    [ "$?" -ne "0" ] && err "[assert_uv_config|out] failed" && exit 1
+  fi
+
+  _pwd=`pwd`
+  cd "$this_folder"
+  if [ ! -f "$this_folder/pyproject.toml" ]; then
+    uv init
+    result="$?"
+    [ "$result" -ne "0" ] && err "[assert_uv_config|out] failed to 'uv init'"
+  else
+    uv sync
+    result="$?"
+    [ "$result" -ne "0" ] && err "[assert_uv_config|out] failed to 'uv sync'"
+  fi
+  cd "$_pwd"
+
+  [ "$result" -ne "0" ] && err "[assert_uv_config|out]  => ${result}" && exit 1
+  info "[assert_uv_config|out]"
+}
+
+############################
+#   name: print_uuid
+#   purpose: prints a generated UUID
+############################
+
+print_uuid(){
+  info "[print_uuid|in] ($1)"
+
+  UUID=$(uuidgen)
+  echo "generated UUID => $UUID"
+
+  echo "[print_uuid|out]"
+}
+
+##########################################
+####### ------- terraform -------  #######
+##########################################
+
+############################
+#   name: terraform_autodeploy
+#   purpose: automatically deploys terraform infrastructure
+#   parameters: $1 (terraform folder path)
+############################
+terraform_autodeploy(){
+  info "[terraform_autodeploy] ..."
+
+  [ -z $1 ] && err "[terraform_autodeploy] missing function argument FOLDER" && return 1
+  local folder="$1"
+
+  verify_prereqs terraform
+  if [ ! "$?" -eq "0" ] ; then return 1; fi
+
+  _pwd=$(pwd)
+  cd "$folder"
+
+  terraform init
+  terraform plan
+  terraform apply -auto-approve -lock=true -lock-timeout=10m
+  if [ ! "$?" -eq "0" ]; then err "[terraform_autodeploy] could not apply" && cd "$_pwd" && return 1; fi
+  cd "$_pwd"
+  info "[terraform_autodeploy] ...done."
+}
+
+############################
+#   name: terraform_autodestroy
+#   purpose: automatically destroys terraform infrastructure
+#   parameters: $1 (terraform folder path)
+############################
+
+terraform_autodestroy(){
+  info "[terraform_autodestroy] ..."
+
+  [ -z $1 ] && err "[terraform_autodestroy] missing function argument FOLDER" && return 1
+  local folder="$1"
+
+  verify_prereqs terraform
+  if [ ! "$?" -eq "0" ] ; then return 1; fi
+
+  _pwd=$(pwd)
+  cd "$folder"
+
+  terraform destroy -auto-approve -lock=true -lock-timeout=10m
+  if [ ! "$?" -eq "0" ]; then err "[terraform_autodestroy] could not apply" && cd "$_pwd" && return 1; fi
+  cd "$_pwd"
+  info "[terraform_autodestroy] ...done."
+}
+
+##########################################
+#######     ------- js -------     #######
+##########################################
+
+############################
+#   name: npm_deps
+#   purpose: installs npm dependencies in specified directory
+#   parameters: $1 (infrastructure directory)
+############################
+npm_deps(){
+  info "[npm_deps|in] ($1)"
+
+  [ -z $1 ] && err "[npm_deps] missing argument INFRA_DIR" && exit 1
+  local INFRA_DIR="$1"
+
+  _pwd=`pwd`
+  cd "$INFRA_DIR"
+
+  npm install
+
+  result="$?"
+  cd "$_pwd"
+  [ "$result" -ne "0" ] && err "[npm_deps|out]  => ${result}" && exit 1
+  info "[npm_deps|out] => ${result}"
+}
+
+############################
+#   name: npm_publish
+#   purpose: publishes npm package to registry
+#   parameters: $1 (registry), $2 (token), $3 (folder)
+############################
+
+npm_publish(){
+  info "[npm_publish|in] ($1, $2)"
+
+  [ -z $1 ] && err "[npm_publish] missing argument NPM_REGISTRY" && return 1
+  local registry="$1"
+  [ -z $2 ] && err "[npm_publish] missing argument NPM_TOKEN" && return 1
+  local token="$2"
+  [ -z $3 ] && err "[npm_publish] missing argument FOLDER" && return 1
+  local folder="$3"
+
+  _pwd=`pwd`
+  cd "$folder"
+  npm config set "//${registry}/:_authToken" "${token}"
+  npm publish . --access="public"
+  if [ ! "$?" -eq "0" ]; then err "[npm_publish] could not publish" && cd "$_pwd" && return 1; fi
+  cd "$_pwd"
+  info "[npm_publish] ...done."
+}
+
+##########################################
+#######     ------- aws -------    #######
+##########################################
+
+############################
+#   name: aws_find_kms_alias
+#   purpose: finds AWS KMS alias by name
+#   parameters: $1 (alias name)
+############################
+aws_find_kms_alias(){
+  echo "[aws_find_kms_alias|in] ($1)"
+
+  [ -z $1 ] && err "[aws_find_kms_alias] missing argument ALIAS" && exit 1
+  local ALIAS="$1"
+  result=1
+
+  local alias_resource=$(aws kms list-aliases | jq -r ".\"Aliases\" | .[] | select(.AliasName == \"$ALIAS\") | .AliasName")
+  echo "[aws_find_kms_alias] alias_resource: ${alias_resource}"
+  if [ "$alias_resource" != "" ]; then
+    result=0
+  fi
+
+  echo "[aws_find_kms_alias|out] => ${result}"
+  return ${result}
+}
+
+############################
+#   name: aws_get_cloudfront_cidr
+#   purpose: retrieves CloudFront CIDR blocks and saves to file
+#   parameters: $1 (output file)
+############################
+
+aws_get_cloudfront_cidr(){
+  info "[aws_get_cloudfront_cidr|in] ($1)"
+
+  [ -z $1 ] && err "[aws_get_cloudfront_cidr] missing argument OUTPUT_FILE" && exit 1
+  local OUTPUT_FILE="$1"
+
+  local prefix_list_id=$(aws ec2 describe-managed-prefix-lists | jq -r ".\"PrefixLists\" | .[] | select(.PrefixListName == \"com.amazonaws.global.cloudfront.origin-facing\") | .PrefixListId")
+  local outputs=$(aws ec2 get-managed-prefix-list-entries --prefix-list-id "$prefix_list_id" --output json)
+  echo $outputs | jq -r ".\"Entries\"" > "$OUTPUT_FILE"
+
+  result="$?"
+  [ "$result" -ne "0" ] && err "[aws_get_cloudfront_cidr|out]  => ${result}" && exit 1
+  info "[aws_get_cloudfront_cidr|out] => ${result}"
+}
+
+############################
+#   name: aws_set_profile
+#   purpose: configures AWS CLI profile with credentials
+#   parameters: $1 (profile), $2 (key), $3 (secret), $4 (region), $5 (optional output format)
+############################
+
+aws_set_profile(){
+  info "[aws_set_profile|in] ($1, $2, ${3:0:5}, $4, $5)"
+
+  [ -z $1 ] && err "[aws_set_profile] missing argument PROFILE" && return 1
+  local PROFILE="$1"
+  [ -z $2 ] && err "[aws_set_profile] missing argument KEY" && return 1
+  local KEY="$2"
+  [ -z $3 ] && err "[aws_set_profile] missing argument SECRET" && return 1
+  local SECRET="$3"
+  [ -z $4 ] && err "[aws_set_profile] missing argument REGION" && return 1
+  local REGION="$4"
+
+  if [ ! -z $5 ]; then
+    local OUTPUT="$5"
+  else
+    local OUTPUT="json"
+  fi
+
+  aws configure --profile $PROFILE set region $REGION \
+    && aws configure --profile $PROFILE set output $OUTPUT \
+    && aws configure --profile $PROFILE set aws_secret_access_key $SECRET \
+    && aws configure --profile $PROFILE set aws_access_key_id $KEY
+
+  result="$?"
+  cd "$_pwd"
+  [ "$result" -ne "0" ] && err "[aws_set_profile|out]  => ${result}" && exit 1
+  info "[aws_set_profile|out] => ${result}"
+}
+
+##########################################
+#######     ------- cdk -------    #######
+##########################################
+
+############################
+#   name: cdk_global_reqs
+#   purpose: installs global CDK requirements
+#   parameters: $1 (typescript version), $2 (cdk version), $3 (ts-node version), $4 (integ runner version), $5 (integ tests version), $6 (jest version)
+############################
+cdk_global_reqs(){
+  info "[cdk_global_reqs|in] ($1, $2, $3, $4, $5, $6)"
+
+  [ -z $1 ] && err "[cdk_global_reqs] missing argument TYPESCRIPT_VERSION" && return 1
+  local TYPESCRIPT_VERSION="$1"
+  [ -z $2 ] && err "[cdk_global_reqs] missing argument CDK_VERSION" && return 1
+  local CDK_VERSION="$2"
+  [ -z $3 ] && err "[cdk_global_reqs] missing argument TS_NODE_VERSION" && return 1
+  local TS_NODE_VERSION="$3"
+  [ -z $4 ] && err "[cdk_global_reqs] missing argument INTEG_RUNNER_VERSION" && return 1
+  local INTEG_RUNNER_VERSION="$4"
+  [ -z $5 ] && err "[cdk_global_reqs] missing argument INTEG_TESTS_ALPHA_VERSION" && return 1
+  local INTEG_TESTS_ALPHA_VERSION="$5"
+  [ -z $6 ] && err "[cdk_global_reqs] missing argument JEST_VERSION" && return 1
+  local JEST_VERSION="$6"
+
+  npm install -g "typescript@${TYPESCRIPT_VERSION}" "aws-cdk@${CDK_VERSION}" "ts-node@${TS_NODE_VERSION}" \
+   "@aws-cdk/integ-runner@${INTEG_RUNNER_VERSION}" "@aws-cdk/integ-tests-alpha@${INTEG_TESTS_ALPHA_VERSION}" \
+   "jest@${JEST_VERSION}"
+  result="$?"
+  [ "$result" -ne "0" ] && err "[cdk_global_reqs|out]  => ${result}" && exit 1
+  info "[cdk_global_reqs|out] => ${result}"
+}
+
+############################
+#   name: cdk_scaffolding
+#   purpose: creates CDK project scaffolding
+#   parameters: $1 (infrastructure directory)
+############################
+
+cdk_scaffolding(){
+  info "[cdk_scaffolding|in] ($1)"
+
+  [ -z $1 ] && err "[cdk_scaffolding] missing argument INFRA_DIR" && exit 1
+  local INFRA_DIR="$1"
+
+  _pwd=`pwd`
+  cd "$INFRA_DIR"
+
+  cdk init app --language typescript
+
+  result="$?"
+  cd "$_pwd"
+  [ "$result" -ne "0" ] && err "[cdk_scaffolding|out]  => ${result}" && exit 1
+  info "[cdk_scaffolding|out] => ${result}"
+}
+
+############################
+#   name: cdk_infra_bootstrap
+#   purpose: bootstraps CDK infrastructure with dependencies
+#   parameters: $1-6 (various version parameters), $7 (infrastructure directory)
+############################
+
+cdk_infra_bootstrap(){
+  info "[cdk_infra_bootstrap|in] ($1, $2, $3, $4, $5, $6)"
+
+  [ -z $1 ] && err "[cdk_infra_bootstrap] missing argument TYPESCRIPT_VERSION" && return 1
+  local TYPESCRIPT_VERSION="$1"
+  [ -z $2 ] && err "[cdk_infra_bootstrap] missing argument CDK_VERSION" && return 1
+  local CDK_VERSION="$2"
+  [ -z $3 ] && err "[cdk_infra_bootstrap] missing argument TS_NODE_VERSION" && return 1
+  local TS_NODE_VERSION="$3"
+  [ -z $4 ] && err "[cdk_infra_bootstrap] missing argument INTEG_RUNNER_VERSION" && return 1
+  local INTEG_RUNNER_VERSION="$4"
+  [ -z $5 ] && err "[cdk_infra_bootstrap] missing argument INTEG_TESTS_ALPHA_VERSION" && return 1
+  local INTEG_TESTS_ALPHA_VERSION="$5"
+  [ -z $6 ] && err "[cdk_infra_bootstrap] missing argument JEST_VERSION" && return 1
+  local JEST_VERSION="$6"
+  [ -z $7 ] && err "[cdk_infra_bootstrap] missing argument INFRA_DIR" && return 1
+  local INFRA_DIR="$7"
+
+  cdk_global_reqs "$TYPESCRIPT_VERSION" "$CDK_VERSION" "$TS_NODE_VERSION" "$INTEG_RUNNER_VERSION" \
+    "$INTEG_TESTS_ALPHA_VERSION" "$JEST_VERSION"  && cdk_scaffolding "$INFRA_DIR"
+
+  result="$?"
+  [ "$result" -ne "0" ] && err "[cdk_infra_bootstrap|out]  => ${result}" && exit 1
+  info "[cdk_infra_bootstrap|out] => ${result}"
+}
+
+############################
+#   name: cdk_infra
+#   purpose: manages CDK infrastructure deployment/destruction
+#   parameters: $1 (operation: on/off/bootstrap), $2 (optional infra folder), $3 (optional stacks)
+############################
+
+cdk_infra()
+{
+  # usage:
+  #    $(basename $0) { operation } [infrastructure_folder]
+  #      options:
+  #      - operation: { on | off }
+  #      - infrastructure_folder: default=infrastructure 
+  info "[cdk_infra|in] ($1) ($2)"
+
+  local DEFAULT_INFRA_DIR=infrastructure
+
+  [ -z $1 ] && usage
+  [ "$1" != "on" ] && [ "$1" != "off" ]&& [ "$1" != "bootstrap" ] && usage
+  local operation="$1"
+  local tf_dir="${DEFAULT_INFRA_DIR}"
+  if [ ! -z $2 ]; then
+    local tf_dir="$2"
+  else
+    info "[cdk_infra] assuming default infra folder: ${DEFAULT_INFRA_DIR}"
+  fi
+
+  if [ ! -z $3 ]; then
+    local stacks="$3"
+  else
+    local stacks="--all"
+  fi
+
+  _pwd=`pwd`
+  cd "$tf_dir"
+
+  if [ "$operation" == "on" ]; then
+    cdk synth "$stacks"
+    [ "$?" -ne "0" ] && err "[infra] couldn't synth" && cd "$_pwd" && exit 1
+    cdk deploy "$stacks" --require-approval=never -v --debug
+    [ "$?" -ne "0" ] && err "[infra] couldn't deploy" && cd "$_pwd" && exit 1
+  elif [ "$operation" == "off" ]; then
+    cdk destroy "$stacks" --force
+    [ "$?" -ne "0" ] && err "[infra] couldn't destroy" && cd "$_pwd" && exit 1
+  elif [ "$operation" == "bootstrap" ]; then
+    cdk bootstrap --force --termination-protection false
+    [ "$?" -ne "0" ] && err "[infra] couldn't bootstrap" && cd "$_pwd" && exit 1
+  fi
+
+  cd "$_pwd"
+  info "[cdk_infra|out]"
+}
+
+############################
+#   name: cdk_setup
+#   purpose: sets up CDK project dependencies
+#   parameters: $1 (optional infrastructure directory)
+############################
+
+cdk_setup()
+{
+    info "[cdk_setup|in] ($1)"
+    local DEFAULT_INFRA_DIR=infrastructure
+
+    local tf_dir="${DEFAULT_INFRA_DIR}"
+    if [ ! -z $1 ]; then
+      local tf_dir="$1"
+    else
+      info "[cdk_setup] assuming default infra folder: ${DEFAULT_INFRA_DIR}"
+    fi
+    _pwd=`pwd`
+    cd "$tf_dir"
+    npm install
+    result="$?"
+    cd "$_pwd"
+    [ "$result" -ne "0" ] && err "[cdk_setup|out]  => ${result}" && exit 1
+    info "[cdk_setup|out] => ${result}"
+}
+
+##########################################
+#######   ------- python -------   #######
+##########################################
+
+############################
+#   name: python_add_pip_index_to_requirements
+#   purpose: adds extra pip index URL to requirements file
+#   parameters: $1 (extra index URL), $2 (requirements file)
+############################
+python_add_pip_index_to_requirements(){
+  info "[python_add_pip_index_to_requirements|in] ($1, $2)"
+
+  [ -z $1 ] && err "[python_add_pip_index_to_requirements] missing argument EXTRA_INDEX_URL" && exit 1
+  local EXTRA_INDEX_URL="$1"
+  [ -z $2 ] && err "[python_add_pip_index_to_requirements] missing argument REQS_FILE" && exit 1
+  local REQS_FILE="$2"
+  local OLD_REQS_FILE="${REQS_FILE}_old"
+
+  cat "$REQS_FILE" > "$OLD_REQS_FILE"
+  echo "--extra-index-url $EXTRA_INDEX_URL" > "$REQS_FILE"
+  cat "$OLD_REQS_FILE" >> "$REQS_FILE"
+  result="$?"
+
+  [ "$result" -ne "0" ] && err "[python_add_pip_index_to_requirements|out] could not add the line" && exit 1
+  info "[python_add_pip_index_to_requirements|out] => ${result}"
+}
+
+############################
+#   name: python_build
+#   purpose: builds Python package using python -m build
+#   parameters: none (uses global this_folder)
+############################
+
+python_build(){
+  info "[python_build] ..."
+
+  _pwd=`pwd`
+  cd "$this_folder"
+
+  rm -rf dist
+  python3 -m build -n
+  [ "$?" -ne "0" ] && err "[python_build] ooppss" && exit 1
+
+  cd "$_pwd"
+  echo "[python_build] ...done."
+}
+
+############################
+#   name: python_pypi_publish
+#   purpose: publishes Python package to PyPI
+#   parameters: $1 (username), $2 (token)
+############################
+
+python_pypi_publish(){
+  info "[python_pypi_publish|in] ($1, ${2:0:7})"
+
+  [ -z "$2" ] && usage
+  [ -z "$1" ] && usage
+  user="$1"
+  token="$2"
+
+  _pwd=`pwd`
+  cd "$this_folder"
+
+  twine upload -u $user -p $token dist/*
+  [ "$?" -ne "0" ] && err "[python_pypi_publish] ooppss" && exit 1
+
+  cd "$_pwd"
+  echo "[python_pypi_publish|out]"
+}
+
+############################
+#   name: python_twine_publish
+#   purpose: publishes Python package using twine
+#   parameters: $1 (username), $2 (password), $3 (optional repository URL)
+############################
+
+python_twine_publish(){
+  info "[python_twine_publish|in] ($1, ${2:0:5}, $3)"
+
+  [ -z "$1" ] || [ -z "$2" ] && usage
+  user="$1"
+  pswd="$2"
+
+  _pwd=`pwd`
+  cd "$this_folder"
+
+  if [ ! -z "$3" ]; then
+    repo_url="$3" 
+    twine upload --verbose -u "${user}" -p "${pswd}" --repository-url "${repo_url}" dist/*.whl 
+  else
+    twine upload --verbose -u "${user}" -p "${pswd}" dist/*.whl 
+  fi
+
+  result=$?
+  cd "$_pwd"
+  [ "$result" -ne "0" ] && err "[python_twine_publish|out]  => ${result}" && exit 1
+  info "[python_twine_publish|out] => ${result}"
+}
+
+############################
+#   name: python_code_lint
+#   purpose: runs code linting tools (isort, autoflake, black)
+#   parameters: $1 (optional source folders, default: 'src test')
+############################
+
+python_code_lint()
+{
+    info "[python_code_lint|in]"
+
+    src_folders="src test"
+    if [ ! -z "$1" ]; then
+      src_folders="$1"
+    fi
+
+    info "[python_code_lint] ... isort..."
+    isort --profile black -v $src_folders
+    return_value=$?
+    info "[python_code_lint] ... isort...$return_value"
+    if [ "$return_value" -eq "0" ]; then
+      info "[python_code_lint] ... autoflake..."
+      autoflake --remove-all-unused-imports --in-place --recursive -r $src_folders
+      return_value=$?
+      info "[python_code_lint] ... autoflake...$return_value"
+    fi
+    if [ "$return_value" -eq "0" ]; then
+      info "[python_code_lint] ... black..."
+      black -v -t py38 $src_folders
+      return_value=$?
+      info "[python_code_lint] ... black...$return_value"
+    fi
+    [ "$return_value" -ne "0" ] && exit 1
+    info "[python_code_lint|out] => ${return_value}"
+    return ${return_value}
+}
+
+############################
+#   name: python_code_check
+#   purpose: runs code quality checks (isort, autoflake, black, pylint, bandit)
+#   parameters: $1 (optional source folders), $2 (optional src folder for bandit)
+############################
+
+python_code_check()
+{
+    info "[python_code_check|in]"
+
+    src_folders="src test"
+    if [ ! -z "$1" ]; then
+      src_folders="$1"
+    fi
+
+    local src_folder="src"
+    if [ ! -z "$2" ]; then
+      src_folder="$2"
+    fi
+    
+    info "[python_code_check] ... isort..."
+    isort --profile black -v $src_folders
+    return_value=$?
+    info "[python_code_check] ... isort...$return_value"
+    if [ "$return_value" -eq "0" ]; then
+      info "[python_code_check] ... autoflake..."
+      autoflake --check -r $src_folders
+      return_value=$?
+      info "[python_code_check] ... autoflake...$return_value"
+    fi
+    if [ "$return_value" -eq "0" ]; then
+      info "[python_code_check] ... black..."
+      black --check $src_folders
+      return_value=$?
+      info "[python_code_check] ... black...$return_value"
+    fi
+
+    if [ "$return_value" -eq "0" ]; then
+      info "[python_code_check] ... pylint..."
+      pylint $src_folders
+      return_value=$?
+      info "[python_code_check] ... pylint...$return_value"
+    fi
+
+    if [ "$return_value" -eq "0" ]; then
+      info "[python_code_check] ... bandit..."
+      bandit -r $src_folder
+      return_value=$?
+      info "[python_code_check] ... bandit...$return_value"
+    fi
+   
+    [ "$return_value" -ne "0" ] && exit 1
+    info "[python_code_check|out] => ${return_value}"
+    return ${return_value}
+}
+
+############################
+#   name: python_print_coverage
+#   purpose: prints test coverage report
+#   parameters: none
+############################
+
+python_print_coverage()
+{
+  info "[python_print_coverage|in]"
+  coverage report -m
+  result="$?"
+  [ "$result" -ne "0" ] && exit 1
+  info "[python_print_coverage|out] => $result"
+  return ${result}
+}
+
+############################
+#   name: python_check_coverage
+#   purpose: checks if coverage meets minimum threshold
+#   parameters: $1 (coverage threshold percentage)
+############################
+
+python_check_coverage()
+{
+  info "[python_check_coverage|in] ($1)"
+
+  [ -z "$1" ] && usage
+
+  local threshold=$1
+  score=$(coverage report | awk '$1 == "TOTAL" {print $NF+0}')
+   result="$?"
+  [ "$result" -ne "0" ] && exit 1
+  if (( $threshold > $score )); then
+    err "[python_check_coverage] $score doesn't meet $threshold"
+    exit 1
+  fi
+  info "[python_check_coverage|out] => $score"
+}
+
+############################
+#   name: python_test
+#   purpose: runs Python tests with pytest and coverage
+#   parameters: $1 (optional test path)
+############################
+
+python_test()
+{
+    info "[python_test|in] ($1)"
+    python -m pytest -x -s -vv --durations=0 --cov=src --junitxml=tests-results.xml --cov-report=xml --cov-report=html "$1"
+    return_value="$?"
+    [ "$return_value" -ne "0" ] && exit 1
+    info "[python_test|out] => ${return_value}"
+    return ${return_value}
+}
+
+############################
+#   name: python_reqs
+#   purpose: installs Python requirements from file
+#   parameters: $1 (optional requirements file, default: requirements.txt)
+############################
+
+python_reqs()
+{
+    info "[python_reqs|in] ($1)"
+
+    local REQS_FILE=requirements.txt
+    if [ ! -z $1 ]; then
+      REQS_FILE="$1"
+    fi
+
+    pip install -r "$REQS_FILE"
+    [ "$?" -ne "0" ] && exit 1
+    info "[python_reqs|out]"
+}
+
+############################
+#   name: python_hatch_build
+#   purpose: builds Python package using hatch
+#   parameters: $1 (optional root directory)
+############################
+
+python_hatch_build(){
+  echo "[python_hatch_build] ($1)..."
+
+  local ROOT_DIR="$this_folder"
+  if [ ! -z $1 ]; then
+    ROOT_DIR="$1"
+  fi
+
+  _pwd=`pwd`
+  cd "$ROOT_DIR"
+
+  rm -rf dist
+  hatch build
+  if [ ! "$?" -eq "0" ] ; then echo "[python_hatch_build] could not build" && cd "$_pwd" && exit 1; fi
+
+  cd "$_pwd"
+  echo "[python_hatch_build] ...done."
+}
+
+############################
+#   name: python_hatch_publish
+#   purpose: publishes Python package using hatch
+#   parameters: $1 (optional root directory)
+############################
+
+python_hatch_publish(){
+  echo "[python_hatch_publish] ($1)..."
+
+  local ROOT_DIR="$this_folder"
+  if [ ! -z $1 ]; then
+    ROOT_DIR="$1"
+  fi
+
+  _pwd=`pwd`
+  cd "$ROOT_DIR"
+
+  hatch publish -n dist
+  if [ ! "$?" -eq "0" ] ; then echo "[python_hatch_publish] could not publish" && cd "$_pwd" && exit 1; fi
+
+  cd "$_pwd"
+  echo "[python_hatch_publish] ...done."
+}
+
+############################
+#   name: build_cookiecutter_template
+#   purpose: builds a cookiecutter template as zip archive
+#   parameters: $1 (template location folder)
+############################
+
+build_cookiecutter_template(){
+  info "[build_cookiecutter_template|in] ($1)"
+  [[ -z "$1" ]] && err "[build_cookiecutter_template] must provide TEMPLATE_LOCATION folder" && exit 1
+  local TEMPLATE_LOCATION="$1"
+
+  [[ ! -d "$TEMPLATE_LOCATION" ]] && err "[build_cookiecutter_template] TEMPLATE_LOCATION folder not found" && exit 1
+  local TEMPLATE_NAME=$(basename "$TEMPLATE_LOCATION")
+  info "[build_cookiecutter_template|in] template name: $TEMPLATE_NAME"
+
+  _pwd=`pwd`
+  cd "$TEMPLATE_LOCATION/.."
+  local zipname="cookiecutter.zip"
+  local finalzipfile="$TEMPLATE_LOCATION/$zipname"
+  rm "$finalzipfile" 2>/dev/null
+  zip -r "$zipname" "$TEMPLATE_NAME" --quiet && mv $zipname $finalzipfile
+  result="$?"
+  cd "$_pwd"
+  [ "$result" -ne "0" ] && err "[build_cookiecutter_template|out]  => ${result}" && exit 1
+  info "[build_cookiecutter_template|out] => ${result}"
+}
+
+############################
+#   name: test_cookiecutter_template
+#   purpose: tests a cookiecutter template by creating instance
+#   parameters: $1 (template location), $2 (test location)
+############################
+
+test_cookiecutter_template(){
+  info "[test_cookiecutter_template|in] ($1, $2)"
+
+  [[ -z "$1" ]] && err "[test_cookiecutter_template] must provide TEMPLATE_LOCATION folder" && exit 1
+  local TEMPLATE_LOCATION="$1"
+
+  local TEMPLATE_NAME=$(basename "$TEMPLATE_LOCATION")
+  info "[test_cookiecutter_template|in] template name: $TEMPLATE_NAME"
+
+  [[ -z "$2" ]] && err "[test_cookiecutter_template] must provide TEST_LOCATION folder" && exit 1
+  local TEST_LOCATION="$2"
+
+  _pwd=`pwd`
+  cd "$TEST_LOCATION" && pipx run cookiecutter --no-input "$TEMPLATE_LOCATION"
+  result="$?"
+  cd "$_pwd"
+  info "[test_cookiecutter_template] trying to open vscode on test project: $TEST_LOCATION/$TEMPLATE_NAME"
+  code "$TEST_LOCATION/$TEMPLATE_NAME" &
+  [ "$result" -ne "0" ] && err "[test_cookiecutter_template|out]  => ${result}" && exit 1
+  info "[test_cookiecutter_template|out] => ${result}"
+}
+
+############################
+#   name: poetry_reqs
+#   purpose: installs poetry dependencies and pre-commit hooks
+#   parameters: none (uses global this_folder)
+############################
+
+poetry_reqs(){
+  info "[poetry_reqs|in]"
+  _pwd=`pwd`
+  cd "$this_folder"
+
+  poetry install --with dev && poetry run pre-commit install --install-hooks
+  local result="$?"
+  if [ ! "$result" -eq "0" ] ; then err "[poetry_reqs] could not install dependencies"; fi
+
+  cd "$_pwd"
+
+  local msg="[poetry_reqs|out] => ${result}"
+  [[ ! "$result" -eq "0" ]] && info "$msg" && exit 1
+  info "$msg"
+}
+
+############################
+#   name: lint_check_ruff
+#   purpose: runs ruff linter check on code
+#   parameters: none (uses global this_folder)
+############################
+
+lint_check_ruff(){
+  info "[lint_check_ruff|in]"
+  _pwd=`pwd`
+
+  cd "$this_folder"
+
+  poetry run ruff check
+  local result="$?"
+  if [ ! "$result" -eq "0" ] ; then err "[lint_check_ruff] ruff linter check had issues"; fi
+
+  cd "$_pwd"
+
+  local msg="[lint_check_ruff|out] => ${result}"
+  [[ ! "$result" -eq "0" ]] && info "$msg" && exit 1
+  info "$msg"
+}
+
+############################
+#   name: poetry_pytest_unit
+#   purpose: runs unit tests using poetry and pytest with coverage
+#   parameters: $1 (test folder), $2 (optional src folder)
+############################
+
+poetry_pytest_unit(){
+  info "[poetry_pytest_unit|in] ($1, $2)"
+
+  [[ -z "$1" ]] && err "[poetry_pytest_unit] must provide TEST_FOLDER" && exit 1
+  local TEST_FOLDER="$1"
+  local SRC_FOLDER="$this_folder/src"
+  [[ ! -z "$2" ]] && SRC_FOLDER="$2"
+
+
+  _pwd=`pwd`
+  cd "$this_folder"
+
+  poetry run pytest "$TEST_FOLDER" -x -s -vv --durations=0 \
+    --cov="$SRC_FOLDER" \
+    --cov-report=term-missing \
+    --cov-report=html \
+    --cov-report=xml \
+    --junitxml=unit-tests-results.xml
+  local result="$?"
+  [[ ! "$result" -eq "0" ]] && err "[poetry_pytest_unit] tests failed"
+
+  cd "$_pwd"
+
+  local msg="[poetry_pytest_unit|out] => ${result}"
+  [[ ! "$result" -eq "0" ]] && info "$msg" && exit 1
+  info "$msg"
+}
+
+############################
+#   name: poetry_pytest_bdd
+#   purpose: runs BDD tests using poetry and pytest with coverage
+#   parameters: $1 (test folder), $2 (optional src folder)
+############################
+
+poetry_pytest_bdd(){
+  info "[poetry_pytest_bdd|in] ($1)"
+
+  [[ -z "$1" ]] && err "[poetry_pytest_bdd] must provide TEST_FOLDER" && exit 1
+  local TEST_FOLDER="$1"
+  local SRC_FOLDER="$this_folder/src"
+  [[ ! -z "$2" ]] && SRC_FOLDER="$2"
+
+  _pwd=`pwd`
+  cd "$this_folder"
+  # Clear existing coverage and run BDD tests
+  poetry run coverage erase
+  poetry run pytest "$TEST_FOLDER" -x -s -vv --durations=0 \
+    --cov="$SRC_FOLDER" \
+    --cov-report=term-missing \
+    --cov-report=html \
+    --cov-report=xml \
+    --junitxml=bdd-tests-results.xml
+  local result="$?"
+  [[ ! "$result" -eq "0" ]] && err "[poetry_pytest_bdd] tests failed"
+
+  cd "$_pwd"
+
+  local msg="[poetry_pytest_bdd|out] => ${result}"
+  [[ ! "$result" -eq "0" ]] && info "$msg" && exit 1
+  info "$msg"
+}
+
+############################
+#   name: python_poetry_print_coverage
+#   purpose: prints coverage report using poetry
+#   parameters: none
+############################
+
+python_poetry_print_coverage()
+{
+  info "[python_poetry_print_coverage|in]"
+  
+  poetry run coverage report --show-missing
+  poetry run coverage html
+  poetry run coverage xml
+  result="$?"
+  [ "$result" -ne "0" ] && exit 1
+  info "[python_poetry_print_coverage|out] => $result"
+  return ${result}
+}
+
+############################
+#   name: python_poetry_check_coverage
+#   purpose: checks coverage threshold using poetry
+#   parameters: $1 (coverage threshold percentage)
+############################
+
+python_poetry_check_coverage()
+{
+  info "[python_poetry_check_coverage|in] ($1)"
+  [ -z "$1" ] && usage
+
+  local threshold=$1
+  score=$(poetry run coverage report | awk '$1 == "TOTAL" {print $NF+0}')
+  result="$?"
+  [ "$result" -ne "0" ] && exit 1
+  if (( $threshold > $score )); then
+    err "[python_poetry_check_coverage] $score doesn't meet $threshold"
+    exit 1
+  fi
+  info "[python_poetry_check_coverage|out] => $score"
+}
+
+############################
+#   name: poetry_build
+#   purpose: builds project using poetry and creates changelog
+#   parameters: none (uses global this_folder)
+############################
+
+poetry_build(){
+  info "[poetry_build|in]"
+  _pwd=`pwd`
+  cd "$this_folder"
+  changelog
+  rm -rf dist/*
+  poetry build
+  local result="$?"
+  [[ ! "$result" -eq "0" ]] && err "[poetry_build] build failed"
+
+  cd "$_pwd"
+  local msg="[poetry_build|out] => ${result}"
+  [[ ! "$result" -eq "0" ]] && info "$msg" && exit 1
+  info "$msg"
+}
+
+############################
+#   name: poetry_publish_az
+#   purpose: publishes package to Azure DevOps using poetry
+#   parameters: $1 (repo URL), $2 (repo name), $3 (username), $4 (password)
+############################
+
+poetry_publish_az(){
+  info "[poetry_publish_az|in]"
+
+  [ -z $1 ] && err "[poetry_publish_az] missing argument REPO_URL" && exit 1
+  local REPO_URL="$1"
+  [ -z $2 ] && err "[poetry_publish_az] missing argument REPO_NAME" && exit 1
+  local REPO_NAME="$2"
+  [ -z $3 ] && err "[poetry_publish_az] missing argument REPO_USER" && exit 1
+  local REPO_USER="$3"
+  [ -z $4 ] && err "[poetry_publish_az] missing argument REPO_PSWD" && exit 1
+  local REPO_PSWD="$4"
+  
+  _pwd=`pwd`
+  cd "$this_folder"
+
+  poetry config "repositories.${REPO_NAME}" "$REPO_URL"
+  poetry config "http-basic.${REPO_NAME}" "$REPO_USER" "$REPO_PSWD"
+  poetry publish -r "$REPO_NAME"
+  local result="$?"
+  [[ ! "$result" -eq "0" ]] && err "[poetry_publish_az] publish failed"
+
+  cd "$_pwd"
+  local msg="[poetry_publish_az|out] => ${result}"
+  [[ ! "$result" -eq "0" ]] && info "$msg" && exit 1
+  info "$msg"
+}
+
+############################
+#   name: poetry_add_supplemental_source_repo
+#   purpose: adds supplemental package repository to poetry config
+#   parameters: $1 (repo name), $2 (repo URL), $3 (username), $4 (token)
+############################
+
+poetry_add_supplemental_source_repo(){
+  info "[poetry_add_supplemental_source_repo|in]"
+  _pwd=`pwd`
+  cd "$this_folder"
+
+  [ -z $1 ] && err "[poetry_add_supplemental_source_repo] missing argument REPO_NAME" && exit 1
+  local REPO_NAME="$1"
+  [ -z $2 ] && err "[poetry_add_supplemental_source_repo] missing argument REPO_URL" && exit 1
+  local REPO_URL="$2"
+  [ -z $3 ] && err "[poetry_add_supplemental_source_repo] missing argument REPO_USR" && exit 1
+  local REPO_USR="$3"
+  [ -z $4 ] && err "[poetry_add_supplemental_source_repo] missing argument REPO_TOKEN" && exit 1
+  local REPO_TOKEN="$4"
+
+  poetry source add --priority=supplemental "$REPO_NAME" "$REPO_URL" && \
+    poetry config "http-basic.${REPO_NAME}" "$REPO_USR" "$REPO_TOKEN"
+  local result="$?"
+
+  cd "$_pwd"
+  local msg="[poetry_add_supplemental_source_repo|out] => ${result}"
+  [[ ! "$result" -eq "0" ]] && info "$msg" && exit 1
+  info "$msg"
+}
+
+############################
+#   name: sca_check_safety
+#   purpose: runs safety check for security vulnerabilities
+#   parameters: $1 (safety API key)
+############################
+
+sca_check_safety(){
+  info "[sca_check_safety|in] (${1:0:3})"
+  _pwd=`pwd`
+
+  [ -z $1 ] && err "[sca_check_safety] missing argument SAFETY_KEY" && exit 1
+  local SAFETY_KEY="$1"
+
+  cd "$this_folder"
+
+  poetry run safety --key "$SAFETY_KEY" scan
+  local result="$?"
+  if [ ! "$result" -eq "0" ] ; then err "[sca_check_safety] code check had issues"; fi
+
+  cd "$_pwd"
+
+  local msg="[sca_check_safety|out] => ${result}"
+  [[ ! "$result" -eq "0" ]] && info "$msg" && exit 1
+  info "$msg"
+}
+
+############################
+#   name: sast_check_bandit
+#   purpose: runs bandit SAST security check
+#   parameters: $1 (source directory)
+############################
+
+sast_check_bandit(){
+  info "[sast_check_bandit|in] ($1)"
+  _pwd=`pwd`
+
+  [ -z $1 ] && err "[sast_check_bandit] missing argument SRC_DIR" && exit 1
+  local SRC_DIR="$1"
+
+  cd "$this_folder"
+
+  poetry run bandit -r $SRC_DIR
+  local result="$?"
+  if [ ! "$result" -eq "0" ] ; then err "[sast_check_bandit] code check had issues"; fi
+
+  cd "$_pwd"
+
+  local msg="[sast_check_bandit|out] => ${result}"
+  [[ ! "$result" -eq "0" ]] && info "$msg" && exit 1
+  info "$msg"
+}
+
+############################
+#   name: poetry_publish_pip
+#   purpose: publishes package to PyPI using poetry
+#   parameters: $1 (PyPI username), $2 (PyPI token)
+############################
+
+poetry_publish_pip(){
+  info "[poetry_publish_pip|in] ($1, ${2:0:7})"
+
+  [ -z $1 ] && err "[poetry_publish_pip] missing argument PYPI_USER" && exit 1
+  local PYPI_USER="$1"
+  [ -z $2 ] && err "[poetry_publish_pip] missing argument PYPI_TOKEN" && exit 1
+  local PYPI_TOKEN="$2"
+  
+  _pwd=`pwd`
+  cd "$this_folder"
+
+  poetry publish -u "$PYPI_USER" -p "$PYPI_TOKEN"
+  local result="$?"
+  [[ ! "$result" -eq "0" ]] && err "[poetry_publish_pip] publish failed"
+
+  cd "$_pwd"
+  local msg="[poetry_publish_pip|out] => ${result}"
+  [[ ! "$result" -eq "0" ]] && info "$msg" && exit 1
+  info "$msg"
+}
+
+##########################################
+#######   ------- azure -------    #######
+##########################################
+
+############################
+#   name: az_sp_assign_subscription
+#   purpose: assigns service principal to Azure subscription
+#   parameters: uses env vars APP_ID and ARM_SUBSCRIPTION_ID
+############################
+az_sp_assign_subscription()
+{
+  info "[az_sp_assign_subscription|in]"
+  az role assignment create --assignee "${APP_ID}" --role "Contributor" --scope "/subscriptions/${ARM_SUBSCRIPTION_ID}"
+  info "[az_sp_assign_subscription|out]"
+}
+
+############################
+#   name: az_sp_login
+#   purpose: logs in using Azure service principal
+#   parameters: uses env vars APP_ID, ARM_CLIENT_SECRET, ARM_TENANT_ID
+############################
+
+az_sp_login()
+{
+  info "[az_sp_login|in]"
+  az login --service-principal -u "${APP_ID}" -p "${ARM_CLIENT_SECRET}" --tenant "${ARM_TENANT_ID}" #--subscription "${ARM_SUBSCRIPTION_ID}"
+  info "[az_sp_login|out]"
+}
+
+############################
+#   name: az_login_check
+#   purpose: checks Azure login status by listing VM sizes
+#   parameters: none
+############################
+
+az_login_check()
+{
+  info "[az_login_check|in]"
+  az vm list-sizes --location westus
+  info "[az_login_check|out]"
+}
+
+############################
+#   name: az_logout
+#   purpose: logs out from Azure CLI
+#   parameters: none
+############################
+
+az_logout()
+{
+  info "[az_logout|in]"
+  az logout
+  info "[az_logout|out]"
+}
+
+############################
+#   name: az_list_sp_roles
+#   purpose: lists roles assigned to service principal
+#   parameters: $1 (service principal app display name)
+############################
+
+az_list_sp_roles()
+{
+  info "[az_list_sp_roles|in] ($1)"
+
+  [ -z "$1" ] && err "no sp app display name provided" && exit 1
+  sp_app_name="$1"
+  az role assignment list --all --assignee "${sp_app_name}" --output json --query '[].{principalName:principalName, roleDefinitionName:roleDefinitionName, scope:scope}'
+
+  info "[az_list_sp_roles|out]"
+}
+
+############################
+#   name: az_storage_account_web_config
+#   purpose: configures Azure storage account for static website hosting
+#   parameters: $1 (storage account name), $2 (resource group)
+############################
+
+az_storage_account_web_config(){
+  info "[az_storage_account_web_config|in] ($1, $2)"
+
+  [ -z "$1" ] && err "[az_storage_account_web_config] no STORAGE_ACCOUNT param provided" && exit 1
+  local STORAGE_ACCOUNT="$1"
+  [ -z "$2" ] && err "[az_storage_account_web_config] no resource group provided" && exit 1
+  local RESOURCE_GROUP="$2"
+
+  az storage blob service-properties update --account-name "$STORAGE_ACCOUNT" --static-website true \
+    --index-document "index.html" --404-document "404.html" #--debug --verbose 
+  result="$?"
+
+  if [ "$result" -eq "0" ]; then
+    cors_config=$(az storage cors list --account-name pvdi0textmining0website)
+    cors_result="$?"
+    info "[az_storage_account_web_config] cors_config result: $?"
+    info "[az_storage_account_web_config] cors_config: ->$cors_config<-"
+
+    if [[ "$cors_result" -eq "0" && "$cors_config" != "[]" ]]; then
+      warn "[az_storage_account_web_config] there is cors config already"
+    else
+      info "[az_storage_account_web_config] there is no cors config, goint to set it up"
+      az storage cors add --account-name "$STORAGE_ACCOUNT" --services b --methods GET --origins "*" --allowed-headers "*" --exposed-headers "*"
+      result="$?"
+    fi
+  fi
+
+  if [ "$result" -eq "0" ]; then
+    url=$(az storage account show --name "$STORAGE_ACCOUNT" --resource-group "$RESOURCE_GROUP" --query "primaryEndpoints.web" --output tsv) && \
+      add_entry_to_variables WEBSITE_URL "\"$url\""
+    result="$?"
+  fi
+
+  [ "$result" -ne "0" ] && err "[az_storage_account_web_config|out] could not configure bucket" && exit 1
+
+  info "[az_storage_account_web_config|out] => ${result}"
+}
+
+############################
+#   name: az_upload_static_website
+#   purpose: uploads static website files to Azure storage
+#   parameters: $1 (storage account), $2 (source folder)
+############################
+
+az_upload_static_website(){
+  info "[az_upload_static_website|in] ($1, $2)"
+
+  [ -z "$1" ] && err "[az_upload_static_website] no STORAGE_ACCOUNT param provided" && exit 1
+  local STORAGE_ACCOUNT="$1"
+  [ -z "$2" ] && err "[az_upload_static_website] no SOURCE_FOLDER param provided" && exit 1
+  local SOURCE_FOLDER="$2"
+
+  az storage blob upload-batch --account-name $STORAGE_ACCOUNT --source $SOURCE_FOLDER --destination '$web' --debug --verbose --overwrite
+
+  result="$?"
+  [ "$result" -ne "0" ] && err "[az_upload_static_website|out] could not configure bucket" && exit 1
+
+  info "[az_upload_static_website|out] => ${result}"
+}
+
+############################
+#   name: get_azure_access_token
+#   purpose: obtains Azure access token using client credentials
+#   parameters: $1 (tenant ID), $2 (client ID), $3 (client secret), $4 (scope)
+############################
+
+get_azure_access_token(){
+  info "[get_azure_access_token|in] ($1, $2, ${3:0:3}, $4)"
+
+  [ -z $1 ] && err "[get_azure_access_token] missing argument TENANT_ID" && exit 1
+  TENANT_ID="$1"
+  [ -z $2 ] && err "[get_azure_access_token] missing argument BIFROST_CLIENT_ID" && exit 1
+  BIFROST_CLIENT_ID="$2"
+  [ -z $3 ] && err "[get_azure_access_token] missing argument APP_REG_CLIENT_SECRET" && exit 1
+  BIFROST_CLIENT_SECRET="$3"
+  [ -z $4 ] && err "[get_azure_access_token] missing argument SCOPE" && exit 1
+  SCOPE="$4"
+
+
+  local azure_token_api=https://login.microsoftonline.com/${TENANT_ID}/oauth2/v2.0/token
+
+  local response=$(curl -s -X POST "${azure_token_api}" -H "Content-Type: application/x-www-form-urlencoded" \
+      --data-urlencode "grant_type=client_credentials" \
+      --data-urlencode "client_id=${BIFROST_CLIENT_ID}" \
+      --data-urlencode "client_secret=${BIFROST_CLIENT_SECRET}" \
+      --data-urlencode "scope=${SCOPE}" )
+  result="$?"
+  access_token=$(echo "$response" | jq -r '.access_token')
+  add_entry_to_secrets "AZURE_ACCESS_TOKEN" "$access_token"
+
+  [ "$result" -ne "0" ] && err "[get_azure_access_token|out]  => ${result}" && exit 1
+  info "[get_azure_access_token|out] => ${access_token}"
+}
+
+##########################################
+####### ------- databricks ------- #######
+##########################################
+
+############################
+#   name: databricks_set_cli_access
+#   purpose: configures Databricks CLI access using Azure login
+#   parameters: $1 (workspace URL), $2 (subscription ID)
+############################
+databricks_set_cli_access()
+{
+  info "[databricks_set_cli_access|in] ($1, $2)"
+  [ -z "$2" ] && err "no subscription Id provided" && return 1
+  [ -z "$1" ] && err "no workspace url provided" && return 1
+
+  # dd62d6ec-d618-49ad-bd43-04a2ef12c0fb
+
+  az login
+  az account set --subscription "$2"
+  token=$(az account get-access-token --resource 2ff814a6-3304-4ab8-85cb-cd0e6f879c1d --query "accessToken" --output tsv)
+  add_entry_to_variables DATABRICKS_HOST "$1"
+  add_entry_to_secrets DATABRICKS_TOKEN "$token"
+  info "[databricks_set_cli_access|out]"
+}
+
+############################
+#   name: databricks_bundle_deploy
+#   purpose: deploys Databricks bundle to specified target
+#   parameters: $1 (bundle folder), $2 (optional target, default: local)
+############################
+
+databricks_bundle_deploy(){
+  info "[databricks_bundle_deploy|in]"
+
+  [ -z $1 ] && err "[databricks_bundle_deploy] missing argument BUNDLE_FOLDER" && exit 1
+  local BUNDLE_FOLDER="$1"
+  local BUNDLE_TARGET="local"
+  [ ! -z $2 ] && BUNDLE_TARGET="$2"
+
+  [ "main" != "$BUNDLE_TARGET" ] && [ "local" != "$BUNDLE_TARGET" ] && err "[databricks_bundle_deploy] wrong argument BUNDLE_TARGET: $BUNDLE_TARGET" && exit 1
+  info "[databricks_bundle_deploy] BUNDLE_FOLDER: $BUNDLE_FOLDER   BUNDLE_TARGET: $BUNDLE_TARGET"
+
+  _pwd=`pwd`
+  cd "$BUNDLE_FOLDER"
+
+  databricks bundle validate --target "$BUNDLE_TARGET" --debug && \
+    databricks bundle deploy --target "$BUNDLE_TARGET" --auto-approve --fail-on-active-runs --force-lock --debug
+
+  result="$?"
+  cd "$_pwd"
+  [ "$result" -ne "0" ] && err "[databricks_bundle_deploy|out]  => ${result}" && exit 1
+  info "[databricks_bundle_deploy|out] => ${result}"
+}
+
+############################
+#   name: databricks_bundle_destroy
+#   purpose: destroys Databricks bundle from specified target
+#   parameters: $1 (bundle folder), $2 (optional target, default: local)
+############################
+
+databricks_bundle_destroy(){
+  info "[databricks_bundle_destroy|in]"
+
+  [ -z $1 ] && err "[databricks_bundle_destroy] missing argument BUNDLE_FOLDER" && exit 1
+  local BUNDLE_FOLDER="$1"
+  local BUNDLE_TARGET="local"
+  [ ! -z $2 ] && BUNDLE_TARGET="$2"
+
+  [ "main" != "$BUNDLE_TARGET" ] && [ "local" != "$BUNDLE_TARGET" ] && err "[databricks_bundle_destroy] wrong argument BUNDLE_TARGET: $BUNDLE_TARGET" && exit 1
+  info "[databricks_bundle_destroy] BUNDLE_FOLDER: $BUNDLE_FOLDER   BUNDLE_TARGET: $BUNDLE_TARGET"
+
+  _pwd=`pwd`
+  cd "$BUNDLE_FOLDER"
+
+  databricks bundle destroy --target "$BUNDLE_TARGET" --auto-approve --force-lock --debug
+
+  result="$?"
+  cd "$_pwd"
+  [ "$result" -ne "0" ] && err "[databricks_bundle_destroy|out]  => ${result}" && exit 1
+  info "[databricks_bundle_destroy|out] => ${result}"
+}
+
+############################
+#   name: databricks_delete_secret
+#   purpose: deletes secret from Databricks secret scope
+#   parameters: $1 (secret key), $2 (secret scope)
+############################
+
+databricks_delete_secret(){
+  info "[databricks_delete_secret|in] ($1, $2)"
+
+  [ -z $1 ] && err "[databricks_delete_secret] missing argument SECRET_KEY" && exit 1
+  local SECRET_KEY="$1"
+  [ -z $2 ] && err "[databricks_delete_secret] missing argument SECRET_SCOPE" && exit 1
+  local SECRET_SCOPE="$2"
+
+  databricks secrets delete-secret $SECRET_SCOPE $SECRET_KEY
+  result="$?"
+
+  [ "$result" -ne "0" ] && err "[databricks_delete_secret|out] could not delete the secret" && exit 1
+  info "[databricks_delete_secret|out] => ${result}"
+}
+
+############################
+#   name: databricks_set_secret
+#   purpose: sets secret in Databricks secret scope
+#   parameters: $1 (secret key), $2 (secret scope), $3 (secret value)
+############################
+
+databricks_set_secret(){
+  info "[databricks_set_secret|in] ($1, $2, ${3:0:3})"
+
+  [ -z $1 ] && err "[databricks_set_secret] missing argument SECRET_KEY" && exit 1
+  local SECRET_KEY="$1"
+  [ -z $2 ] && err "[databricks_set_secret] missing argument SECRET_SCOPE" && exit 1
+  local SECRET_SCOPE="$2"
+  [ -z $3 ] && err "[databricks_set_secret] missing argument SECRET_VALUE" && exit 1
+  local SECRET_VALUE="$3"
+
+  query=$(databricks secrets get-secret $SECRET_SCOPE $SECRET_KEY)
+  if [ "$?" -ne "0" ]; then
+    info "[databricks_set_secret] creating secret $SECRET_KEY in scope $SECRET_SCOPE"
+    databricks secrets put-secret "$SECRET_SCOPE" "$SECRET_KEY" --string-value "$SECRET_VALUE"
+  else
+    warn "[databricks_set_secret] secret is already there"
+  fi
+  result="$?"
+  [ "$result" -ne "0" ] && err "[databricks_set_secret|out]  => ${result}" && exit 1
+  info "[databricks_set_secret|out] => ${result}"
+}
+
+
+############################
+#   name: get_azure_artifact
+#   purpose: downloads universal artifact from Azure DevOps artifacts feed
+#   parameters: $1 (organization), $2 (feed), $3 (name), $4 (version), $5 (optional target path)
+############################
+
+get_azure_artifact(){
+  info "[get_azure_artifact|in] ($1, $2, $3, $4, $5)"
+
+  [ -z "$1" ] && err "[get_azure_artifact] missing argument ORGANIZATION" && exit 1
+  local ORGANIZATION="$1"
+  [ -z "$2" ] && err "[get_azure_artifact] missing argument FEED" && exit 1
+  local FEED="$2"
+  [ -z "$3" ] && err "[get_azure_artifact] missing argument NAME" && exit 1
+  local NAME="$3"
+  [ -z "$4" ] && err "[get_azure_artifact] missing argument VERSION" && exit 1
+  local VERSION="$4"
+
+  local TARGET="."
+  [ ! -z "$5" ] && TARGET="$5"
+  [ ! -d "$TARGET" ] && mkdir -p "$TARGET"
+
+  az artifacts universal download --organization "$ORGANIZATION" --feed "$FEED" --name "$NAME" --version "$VERSION" --path "$TARGET"
+  result="$?"
+
+  [ "$result" -ne "0" ] && err "[get_azure_artifact|out] => ${result}" && exit 1
+  info "[get_azure_artifact|out] => ${result}"
+}
+
+
+##########################################
+#######  ------- assorted -------  #######
+##########################################
+
+############################
+#   name: test_js_lambda
+#   purpose: tests JavaScript Lambda function with Jest
+#   parameters: $1 (function directory)
+############################
+test_js_lambda(){
+  info "[test_js_lambda|in] ({$1})"
+
+  [ -z $1 ] && err "[get_cloudfront_cidr] missing argument FUNCTION_DIR" && exit 1
+  local FUNCTION_DIR="$1"
+  _pwd=`pwd`
+  cd "$FUNCTION_DIR"
+
+  npm install
+  jest
+
+  result="$?"
+  cd "$_pwd"
+  [ "$result" -ne "0" ] && err "[test_js_lambda|out]  => ${result}" && exit 1
+  info "[test_js_lambda|out] => ${result}"
+}
+
+############################
+#   name: zip_js_lambda_function
+#   purpose: creates zip archive of JavaScript Lambda function
+#   parameters: $1 (source dir), $2 (zip file), $3+ (files/folders to include)
+############################
+
+zip_js_lambda_function(){
+  info "[zip_js_lambda_function] ...( $@ )"
+  local usage_msg=$'zip_js_lambda_function: zips a js lambda function:\nusage:\n    zip_js_lambda_function SRC_DIR ZIP_FILE { FILES FOLDERS ... }'
+
+  verify_prereqs npm
+  if [ ! "$?" -eq "0" ] ; then return 1; fi
+
+  if [ -z "$3" ] ; then echo "$usage_msg" && return 1; fi
+
+  local src_dir="$1"
+  local zip_file="$2"
+  local files="${@:3}"
+  local AWS_SDK_MODULE_PATH=$src_dir/node_modules/aws-sdk
+
+  _pwd=`pwd`
+  cd "$src_dir"
+
+  if [ -f "package.json" ]; then
+    npm install &>/dev/null
+    if [ ! "$?" -eq "0" ] ; then err "[zip_js_lambda_function] could not install dependencies" && cd "$_pwd" && return 1; fi
+    if [ -d "${AWS_SDK_MODULE_PATH}" ]; then rm -r "$AWS_SDK_MODULE_PATH"; fi
+  fi
+
+  rm -f "$zip_file"
+  zip -9 -q -r "$zip_file" "$files" &>/dev/null
+  if [ ! "$?" -eq "0" ] ; then err "[zip_js_lambda_function] could not zip it" && cd "$_pwd" && return 1; fi
+
+  cd "$_pwd"
+  info "[zip_js_lambda_function] ...done."
+}
+
+############################
+#   name: get_function_release
+#   purpose: downloads function release artifact from GitHub
+#   parameters: $1 (repository), $2 (artifact name)
+############################
+
+get_function_release(){
+  info "[get_function_release] ...( $@ )"
+  local usage_msg=$'get_function_release: retrieves a function release artifact from github:\nusage:\n    get_function_release REPO ARTIFACT'
+
+  if [ -z "$2" ] ; then echo "$usage_msg" && return 1; fi
+  local repo="$1"
+  local artifact="$2"
+
+  _pwd=`pwd`
+  cd "$this_folder"
+
+  curl -s "https://api.github.com/repos/${repo}/releases/latest" \
+  | grep "browser_download_url.*${artifact}" \
+  | cut -d '"' -f 4 | wget -qi -
+
+  cd "$_pwd"
+  info "[get_function_release] ...done."
+}
+
+############################
+#   name: download_function
+#   purpose: downloads function from GitHub releases to specific file
+#   parameters: $1 (repository), $2 (artifact), $3 (destination file)
+############################
+
+download_function(){
+  info "[download_function|in] ...( $@ )"
+  local usage_msg=$'download_function: downloads a function release artifact from github:\nusage:\n    download_function REPO ARTIFACT DESTINATION_FILE'
+
+  if [ -z "$3" ] ; then echo "$usage_msg" && return 1; fi
+  local repo="$1"
+  local artifact="$2"
+  local file="$3"
+
+  curl -s "https://api.github.com/repos/${repo}/releases/latest" \
+  | grep "browser_download_url.*${artifact}" \
+  | cut -d '"' -f 4 | wget -O "$file" -qi  -
+  if [ ! "$?" -eq "0" ]; then err "[download_function] curl command was not successful" && return 1; fi
+
+  info "[download_function|out] ...done."
+}
+
+############################
+#   name: call_grafana_api
+#   purpose: makes authenticated call to Grafana API via Bifrost
+#   parameters: $1 (Azure access token), $2 (Grafana API token)
+############################
+
+call_grafana_api(){
+  info "[call_grafana_api|in] (${1:0:3}, ${2:0:3})"
+
+  [ -z $1 ] && err "[call_grafana_api] missing argument AZURE_ACCESS_TOKEN" && exit 1
+  AZURE_ACCESS_TOKEN="$1"
+  [ -z $2 ] && err "[call_grafana_api] missing argument GRAFANA_API_TOKEN" && exit 1
+  GRAFANA_API_TOKEN="$2"
+
+  local response=$(curl -s -X GET "https://api.bifrost.heimdall.novonordisk.cloud/grafana/api/org"  \
+      -H "Authorization: Bearer ${AZURE_ACCESS_TOKEN}" \
+      -H "X-Bifrost-Grafana-SA: Bearer ${GRAFANA_API_TOKEN}" )
+  result="$?"
+
+  [ "$result" -ne "0" ] && err "[call_grafana_api|out]  => ${result}" && exit 1
+  info "[call_grafana_api|out] => ${response}"
+}
+
+##########################################
+#######  ------- commons -------   #######
+##########################################
+
+############################
+#   name: commands
+#   purpose: displays helpful command reference information
+#   parameters: none
+############################
+commands() {
+  cat <<EOM
+
+  handy commands:
+
+  python -m venv .venv                                             create virtual environment
+  jupyter-notebook --log-level=40 --no-browser                            starts jupyter server
+  cdk init app --language typescript                                      create new cdk app on typescript
+  npm run build                                                           compile typescript to js
+  npm run watch                                                           watch for changes and compile
+  npm run test                                                            perform the jest unit tests
+  git config user.email "$JTV_GITHUB_EMAIL"                               set local git config email
+  aws-cdk
+    cdk init app --language typescript                                    create new cdk app on typescript
+    cdk deploy                                                            deploy this stack to your default AWS account/region
+    cdk diff                                                              compare deployed stack with current state
+    cdk synth                                                             emits the synthesized CloudFormation template
+  aws
+    aws cloudformation delete-stack --stack-name <STACKNAME>              delete stack to later recreate with bootstrap (see https://stackoverflow.com/questions/71280758/aws-cdk-bootstrap-itself-broken/71283964#71283964)
+    aws configure sso --profile nn --no-browser                           configure sso
+    export AWS_PROFILE=nn                                                 set current environment profile
+    aws sts get-caller-identity                                           check current session
+    aws sts get-caller-identity --profile <PROFILE>                       display session profile info
+    aws lambda invoke --function-name FUNCTION_NAME out --log-type Tail 
+
+EOM
+}
