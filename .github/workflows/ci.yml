@@ -13,5 +13,5 @@ jobs:
       - uses: actions/checkout@v4
       - name: Verify .bashutils is up to date
         run: |
-          ./build_bashutils
+          ./helper.sh build_bashutils
           git diff --exit-code -- .bashutils
