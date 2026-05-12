@@ -222,6 +222,8 @@ prompt_copilot_agent(){
   local result="0"
 
   review_prompt="Review the changes in this PR and provide feedback"
+  stderr_log="$(mktemp)"
+  
   copilot --agent code-review \
     -p "${review_prompt}" \
     --allow-all-tools \
