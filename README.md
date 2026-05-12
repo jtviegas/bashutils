@@ -27,12 +27,21 @@ the downloaded [`bashutils-template.sh`](./bashutils-template.sh) file is a regu
 
 - it creates `.variables`, `.local_variables` and `.secrets` next to the script when needed
 - it downloads `.bashutils` on the first run
-- on later runs it checks for updates at most once per day and replaces the local `.bashutils` only when a newer version exists on this repository `master` branch
+- on later runs it checks for updates at most once per day and replaces the local `.bashutils` from `master` only when newer
+- every downloaded `.bashutils` file is verified with SHA256 using `.bashutils.checksum`
 - you can add your own functions directly to the downloaded script and keep reusing the shared `.bashutils`
 
 ## starter script structure
 
 the starter script already includes the same header / main / footer layout that was previously shown inline in this README, including a `hello_world` example that you can replace with your own commands.
+
+## tests
+
+this repository uses [bats-core](https://github.com/bats-core/bats-core) for tests:
+
+```bash
+bats test
+```
 
 ## notes
 
@@ -42,3 +51,4 @@ the starter script already includes the same header / main / footer layout that 
   - it also defines handy logging functions
   - ...and downloads the `.bashutils` include file when needed
   - ...and later checks for updates at most once per day, replacing that file only when a newer version is available from this repository master branch
+- running `./helper.sh build_bashutils` rebuilds `.bashutils` by concatenating all section files under `sections/` in alphabetical order; keep section files free of top-level executable statements (function definitions only)
