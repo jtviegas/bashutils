@@ -207,116 +207,8 @@ build_bashutils(){
   info "[build_bashutils|out] => 0"
 }
 
-get_pr_review_from_agent(){
-  info "[get_pr_review_from_agent|in]"
-  _pwd=`pwd`
-  cd "$this_folder"
-
-  local result="0"
-
-  review_prompt="Review the changes in this PR and provide feedback"
-  stderr_log="$(mktemp)"
-  
-  copilot --agent agent-pr-review \
-    -p "${review_prompt}" \
-    --allow-all-tools \
-    --no-color \
-    -s > review_output.md 2>"${stderr_log}"
-  result="$?"
-
-  info "[get_pr_review_from_agent] ($result) output: "
-  cat review_output.md
-
-  cd "$_pwd"
-  local msg="[get_pr_review_from_agent|out] => ${result}"
-  [[ ! "$result" -eq "0" ]] && info "$msg" && exit 1
-  info "$msg"
-}
 
 # add your custom bash functions above this line
-
-############################
-#   name: pr_reviewer
-#   purpose: run Copilot PR reviewer and save output to review_output.md
-#   parameters: none
-#   returns: 0 on success (including fallback output), 1 on setup/output validation errors
-#   requires: GITHUB_TOKEN
-############################
-pr_reviewer(){
-  info "[pr_reviewer|in]"
-  local _pwd review_prompt stderr_log rc
-  _pwd=$(pwd)
-
-  _pr_reviewer_finish() {
-    local code msg
-    code="$1"
-    msg="[pr_reviewer|out] => ${code}"
-    cd "$_pwd" || return 1
-    [[ "$code" -ne 0 ]] && err "$msg" && return "$code"
-    info "$msg"
-    return 0
-  }
-
-  if [ -z "${GITHUB_TOKEN:-}" ]; then
-    err "GITHUB_TOKEN secret is required"
-    #_pr_reviewer_finish 1
-    return 1
-  fi
-
-  cd "$this_folder" || return 1
-  if ! test -f .github/agents/agent-pr-review.agent.md; then
-    err "Missing agent definition: .github/agents/agent-pr-review.agent.md"
-    _pr_reviewer_finish 1
-    return 1
-  fi
-
-  review_prompt="Review the changes in this PR and provide feedback"
-  stderr_log="$(mktemp)"
-
-
-  .github/agents/agent-pr-review.agent.md
-
-  copilot --agent agent-pr-review -p "Review the changes in this PR and provide feedback" --allow-all-tools --no-color -s 
-
-  copilot --agent agent-pr-review \
-    -p "${review_prompt}" \
-    --allow-all-tools \
-    --no-color \
-    -s > review_output.md 2>"${stderr_log}" || {
-    rc=$?
-    err "Copilot agent review failed with exit code ${rc}. Captured stderr:"
-    if test -s "${stderr_log}"; then
-      while IFS= read -r line; do
-        err "$line"
-      done < "${stderr_log}"
-    else
-      err "(stderr was empty)"
-    fi
-    if test -s review_output.md; then
-      info "Captured stdout (last 200 lines):"
-      tail -n 200 review_output.md | while IFS= read -r line; do
-        info "$line"
-      done
-    fi
-    {
-      echo "⚠️ Copilot agent review failed (exit code ${rc})."
-      echo
-      echo "Check this workflow run logs for full details."
-    } > review_output.md
-    :
-  }
-
-  if ! test -s review_output.md; then
-    err "Review output file is empty or unreadable (Copilot command completed but produced no review output)."
-    [ -n "${stderr_log}" ] && rm -f "${stderr_log}"
-    _pr_reviewer_finish 1
-    return 1
-  fi
-
-  [ -n "${stderr_log}" ] && rm -f "${stderr_log}"
-  _pr_reviewer_finish 0
-  return 0
-}
 
 # <=== MAIN SECTION END  <====
 
@@ -329,8 +221,6 @@ usage() {
     options:
       - reqs               installs required tools and dependencies
       - build_bashutils    rebuild .bashutils by concatenating all files in sections/
-      - pr_reviewer        runs Copilot PR reviewer and saves output to review_output.md
-      - get_pr_review_from_agent  runs the agent logic to get PR review (used by pr_reviewer)
 EOM
   exit 1
 }
@@ -344,12 +234,6 @@ case "$1" in
     ;;
   build_bashutils)
     build_bashutils
-    ;;
-  pr_reviewer)
-    pr_reviewer
-    ;;
-  get_pr_review_from_agent)
-    get_pr_review_from_agent
     ;;
   *)
     usage
