@@ -157,6 +157,13 @@ reqs(){
     result="$?"
   fi
 
+  which bats > /dev/null 2>&1
+  if [ ! "$?" -eq "0" ] ; then
+    info "[reqs] installing bats ..."
+    sudo apt-get install -y bats
+    result="$?"
+  fi
+
   cd "$_pwd"
   local msg="[reqs|out] => ${result}"
   [[ ! "$result" -eq "0" ]] && info "$msg" && exit 1
@@ -207,6 +214,29 @@ build_bashutils(){
   info "[build_bashutils|out] => 0"
 }
 
+prompt_copilot_agent(){
+  info "[get_pr_review_from_agent|in]"
+  _pwd=`pwd`
+  cd "$this_folder"
+
+  local result="0"
+
+  review_prompt="Review the changes in this PR and provide feedback"
+  copilot --agent code-review \
+    -p "${review_prompt}" \
+    --allow-all-tools \
+    --no-color \
+    -s > review_output.md 2>"${stderr_log}"
+  result="$?"
+  cat review_output.md
+  
+
+  cd "$_pwd"
+  local msg="[get_pr_review_from_agent|out] => ${result}"
+  [[ ! "$result" -eq "0" ]] && info "$msg" && exit 1
+  info "$msg"
+}
+
 
 # add your custom bash functions above this line
 
@@ -221,6 +251,7 @@ usage() {
     options:
       - reqs               installs required tools and dependencies
       - build_bashutils    rebuild .bashutils by concatenating all files in sections/
+      - prompt_copilot_agent   prompts the copilot agent with a review request and outputs the response
 EOM
   exit 1
 }
@@ -234,6 +265,9 @@ case "$1" in
     ;;
   build_bashutils)
     build_bashutils
+    ;;
+  prompt_copilot_agent)
+    prompt_copilot_agent
     ;;
   *)
     usage

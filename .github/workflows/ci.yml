@@ -11,10 +11,14 @@ jobs:
       contents: read
     steps:
       - uses: actions/checkout@v4
-      - name: install bats-core
+      - name: install requirements
         run: |
-          sudo apt-get update
-          sudo apt-get install -y bats
+          ./helper.sh reqs
+      - name: call agent
+        run: |
+          ./helper.sh prompt_copilot_agent
+        env:
+          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
       - name: bash syntax check
         run: bash -n bashutils-template.sh
       - name: run bats tests
