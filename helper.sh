@@ -218,9 +218,12 @@ pr_reviewer(){
   result=0
   stderr_log=""
 
-  cd "$this_folder" || return 1
+  if [ -z "${GITHUB_TOKEN:-}" ]; then
+    err "GITHUB_TOKEN secret is required"
+    result=1
+  fi
 
-  : "${GITHUB_TOKEN:?GITHUB_TOKEN secret is required}"
+  cd "$this_folder" || return 1
   if ! test -f .github/agents/agent-pr-review.agent.md; then
     err "Missing agent definition: .github/agents/agent-pr-review.agent.md"
     result=1
@@ -236,15 +239,19 @@ pr_reviewer(){
       --no-color \
       -s > review_output.md 2>"${stderr_log}" || {
       rc=$?
-      echo "Copilot agent review failed with exit code ${rc}. Captured stderr:"
+      err "Copilot agent review failed with exit code ${rc}. Captured stderr:"
       if test -s "${stderr_log}"; then
-        cat "${stderr_log}"
+        while IFS= read -r line; do
+          err "$line"
+        done < "${stderr_log}"
       else
-        echo "(stderr was empty)"
+        err "(stderr was empty)"
       fi
       if test -s review_output.md; then
-        echo "Captured stdout (last 200 lines):"
-        tail -n 200 review_output.md
+        info "Captured stdout (last 200 lines):"
+        tail -n 200 review_output.md | while IFS= read -r line; do
+          info "$line"
+        done
       fi
       {
         echo "⚠️ Copilot agent review failed (exit code ${rc})."
@@ -256,7 +263,7 @@ pr_reviewer(){
   fi
 
   if [ "$result" -eq 0 ] && ! test -s review_output.md; then
-    echo "Review output file is empty or unreadable (Copilot command completed but produced no review output)."
+    err "Review output file is empty or unreadable (Copilot command completed but produced no review output)."
     result=1
   fi
 
