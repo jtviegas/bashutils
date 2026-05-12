@@ -162,7 +162,6 @@ build_bashutils(){
   info "[build_bashutils|in]"
   local sections_dir="$this_folder/sections"
   local out_file="$this_folder/$INCLUDE_FILE"
-  local out_checksum_file="$this_folder/${INCLUDE_FILE}.checksum"
   local _pwd
   local checksum_result
   _pwd=$(pwd)
@@ -181,7 +180,7 @@ build_bashutils(){
 
   if command -v sha256sum >/dev/null 2>&1; then
     cd "$this_folder" || return 1
-    sha256sum "$INCLUDE_FILE" > "$(basename "$out_checksum_file")"
+    sha256sum "$INCLUDE_FILE" > "${INCLUDE_FILE}.checksum"
     checksum_result="$?"
     cd "$_pwd" || return 1
     if [ "$checksum_result" -ne 0 ]; then
@@ -189,7 +188,7 @@ build_bashutils(){
     fi
   elif command -v shasum >/dev/null 2>&1; then
     cd "$this_folder" || return 1
-    shasum -a 256 "$INCLUDE_FILE" > "$(basename "$out_checksum_file")"
+    shasum -a 256 "$INCLUDE_FILE" > "${INCLUDE_FILE}.checksum"
     checksum_result="$?"
     cd "$_pwd" || return 1
     if [ "$checksum_result" -ne 0 ]; then
@@ -200,9 +199,7 @@ build_bashutils(){
     return 1
   fi
 
-  local result="0"
-  local msg="[build_bashutils|out] => ${result}"
-  info "$msg"
+  info "[build_bashutils|out] => 0"
 }
 
 # add your custom bash functions above this line
