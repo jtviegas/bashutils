@@ -36,7 +36,7 @@ jobs:
 
           review_prompt="Review the changes in this PR and provide feedback"
 
-          copilot /agent agent-pr-review "$review_prompt" > review_output.md 2> review_error.log || {
+          copilot -i "/agent agent-pr-review ${review_prompt}" > review_output.md 2> review_error.log || {
             cat review_error.log
             exit 1
           }
