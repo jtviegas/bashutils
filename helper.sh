@@ -162,6 +162,9 @@ build_bashutils(){
   info "[build_bashutils|in]"
   local sections_dir="$this_folder/sections"
   local out_file="$this_folder/$INCLUDE_FILE"
+  local _pwd
+  local checksum_result
+  _pwd=$(pwd)
 
   [ ! -d "$sections_dir" ] && err "[build_bashutils] sections folder not found: $sections_dir" && return 1
 
@@ -171,14 +174,32 @@ build_bashutils(){
 
   > "$out_file"
   for f in "${files[@]}"; do
-    cat "$f" >> "$out_file"
-    echo >> "$out_file"
+    cat "$f" >> "$out_file" || return 1
+    echo >> "$out_file" || return 1
   done
 
-  local result="$?"
-  local msg="[build_bashutils|out] => ${result}"
-  [[ "$result" -ne 0 ]] && err "$msg" && return 1
-  info "$msg"
+  if command -v sha256sum >/dev/null 2>&1; then
+    cd "$this_folder" || return 1
+    sha256sum "$INCLUDE_FILE" > "${INCLUDE_FILE}.checksum"
+    checksum_result="$?"
+    cd "$_pwd" || return 1
+    if [ "$checksum_result" -ne 0 ]; then
+      return 1
+    fi
+  elif command -v shasum >/dev/null 2>&1; then
+    cd "$this_folder" || return 1
+    shasum -a 256 "$INCLUDE_FILE" > "${INCLUDE_FILE}.checksum"
+    checksum_result="$?"
+    cd "$_pwd" || return 1
+    if [ "$checksum_result" -ne 0 ]; then
+      return 1
+    fi
+  else
+    err "[build_bashutils] please install sha256sum or shasum to generate checksum file"
+    return 1
+  fi
+
+  info "[build_bashutils|out] => 0"
 }
 
 # add your custom bash functions above this line
@@ -214,4 +235,3 @@ case "$1" in
 esac
 
 # <=== FOOTER SECTION END  <===
-

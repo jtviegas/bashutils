@@ -49,6 +49,8 @@ export FILE_LOCAL_VARIABLES=${FILE_LOCAL_VARIABLES:-".local_variables"}
 export FILE_SECRETS=${FILE_SECRETS:-".secrets"}
 export INCLUDE_FILE=${INCLUDE_FILE:-".bashutils"}
 export BASHUTILS_URL=${BASHUTILS_URL:-"https://raw.githubusercontent.com/jtviegas/bashutils/master/.bashutils"}
+export BASHUTILS_CHECKSUM_URL=${BASHUTILS_CHECKSUM_URL:-"https://raw.githubusercontent.com/jtviegas/bashutils/master/.bashutils.checksum"}
+export BASHUTILS_SHA256=${BASHUTILS_SHA256:-""}
 export BASHUTILS_CHECK_INTERVAL_SECONDS=${BASHUTILS_CHECK_INTERVAL_SECONDS:-"86400"}
 
 get_file_mtime_epoch() {
@@ -73,6 +75,9 @@ download_bashutils_if_newer() {
   local elapsed
   local did_remote_check=0
   local bashutils_tmp
+  local checksum_tmp
+  local actual_sha256
+  local expected_sha256
 
   if [ -f "$bashutils" ] && [ -f "$bashutils_last_check" ]; then
     now_epoch=$(date +%s)
@@ -96,8 +101,30 @@ download_bashutils_if_newer() {
     return 1
   fi
 
-  bashutils_tmp="$(mktemp)"
+  if ! command -v sha256sum >/dev/null 2>&1 && ! command -v shasum >/dev/null 2>&1; then
+    err "[download_bashutils_if_newer] please install sha256sum or shasum to verify $INCLUDE_FILE"
+    return 1
+  fi
 
+  if [ -n "$BASHUTILS_SHA256" ]; then
+    expected_sha256="$BASHUTILS_SHA256"
+  else
+    checksum_tmp="$(mktemp)"
+    if ! curl -fsSL "$BASHUTILS_CHECKSUM_URL" -o "$checksum_tmp"; then
+      err "[download_bashutils_if_newer] failed to download $(basename "$BASHUTILS_CHECKSUM_URL")"
+      rm -f "$checksum_tmp"
+      return 1
+    fi
+    # checksum file format: "<sha256> <space><space><optional *>filename"
+    expected_sha256="$(awk -v include_file="$INCLUDE_FILE" 'NF >= 2 && $1 ~ /^[a-fA-F0-9]{64}$/ && ($2 == include_file || $2 == "*" include_file) { print tolower($1); exit }' "$checksum_tmp")"
+    rm -f "$checksum_tmp"
+    if [ -z "$expected_sha256" ]; then
+      err "[download_bashutils_if_newer] invalid checksum file format from $(basename "$BASHUTILS_CHECKSUM_URL")"
+      return 1
+    fi
+  fi
+
+  bashutils_tmp="$(mktemp)"
   if [ ! -f "$bashutils" ]; then
     if ! curl -fsSL -R "$BASHUTILS_URL" -o "$bashutils_tmp"; then
       err "[download_bashutils_if_newer] failed to download $INCLUDE_FILE"
@@ -114,6 +141,22 @@ download_bashutils_if_newer() {
   did_remote_check=1
 
   if [ -s "$bashutils_tmp" ]; then
+    if command -v sha256sum >/dev/null 2>&1; then
+      actual_sha256="$(sha256sum "$bashutils_tmp" | awk '{print $1}')"
+    elif command -v shasum >/dev/null 2>&1; then
+      actual_sha256="$(shasum -a 256 "$bashutils_tmp" | awk '{print $1}')"
+    else
+      err "[download_bashutils_if_newer] please install sha256sum or shasum to verify $INCLUDE_FILE"
+      rm -f "$bashutils_tmp"
+      return 1
+    fi
+
+    if [ "$actual_sha256" != "$expected_sha256" ]; then
+      err "[download_bashutils_if_newer] checksum verification failed for $INCLUDE_FILE"
+      rm -f "$bashutils_tmp"
+      return 1
+    fi
+
     if ! mv "$bashutils_tmp" "$bashutils"; then
       err "[download_bashutils_if_newer] failed to replace $INCLUDE_FILE"
       rm -f "$bashutils_tmp"
