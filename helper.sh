@@ -223,14 +223,14 @@ prompt_copilot_agent(){
 
   review_prompt="Review the changes in this PR and provide feedback"
   stderr_log="$(mktemp)"
-  
+
   copilot --agent code-review \
     -p "${review_prompt}" \
     --allow-all-tools \
-    --no-color \
-    -s > review_output.md 2>"${stderr_log}"
+    --no-color
+  #  -s > review_output.md 2>"${stderr_log}"
   result="$?"
-  cat review_output.md
+  "cat review_output.md
   
 
   cd "$_pwd"
