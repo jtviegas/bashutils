@@ -143,18 +143,23 @@ download_bashutils_if_newer || exit 1
 
 # ===> MAIN SECTION START  ===>
 
-hello_world(){
-  info "[hello_world|in]"
-  local _pwd
-  _pwd=$(pwd)
+reqs(){
+  info "[reqs|in]"
+  _pwd=`pwd`
   cd "$this_folder"
 
-  echo "hello world"
-  local result="$?"
+  local result="0"
+
+  which copilot > /dev/null 2>&1
+  if [ ! "$?" -eq "0" ] ; then
+    info "[reqs] installing copilot ..."
+    npm install -g @github/copilot
+    result="$?"
+  fi
 
   cd "$_pwd"
-  local msg="[hello_world|out] => ${result}"
-  [[ "$result" -ne 0 ]] && err "$msg" && exit 1
+  local msg="[reqs|out] => ${result}"
+  [[ ! "$result" -eq "0" ]] && info "$msg" && exit 1
   info "$msg"
 }
 
@@ -202,6 +207,32 @@ build_bashutils(){
   info "[build_bashutils|out] => 0"
 }
 
+get_pr_review_from_agent(){
+  info "[get_pr_review_from_agent|in]"
+  _pwd=`pwd`
+  cd "$this_folder"
+
+  local result="0"
+
+  review_prompt="Review the changes in this PR and provide feedback"
+  stderr_log="$(mktemp)"
+  
+  copilot --agent agent-pr-review \
+    -p "${review_prompt}" \
+    --allow-all-tools \
+    --no-color \
+    -s > review_output.md 2>"${stderr_log}"
+  result="$?"
+
+  info "[get_pr_review_from_agent] ($result) output: "
+  cat review_output.md
+
+  cd "$_pwd"
+  local msg="[get_pr_review_from_agent|out] => ${result}"
+  [[ ! "$result" -eq "0" ]] && info "$msg" && exit 1
+  info "$msg"
+}
+
 # add your custom bash functions above this line
 
 ############################
@@ -228,7 +259,7 @@ pr_reviewer(){
 
   if [ -z "${GITHUB_TOKEN:-}" ]; then
     err "GITHUB_TOKEN secret is required"
-    _pr_reviewer_finish 1
+    #_pr_reviewer_finish 1
     return 1
   fi
 
@@ -241,6 +272,11 @@ pr_reviewer(){
 
   review_prompt="Review the changes in this PR and provide feedback"
   stderr_log="$(mktemp)"
+
+
+  .github/agents/agent-pr-review.agent.md
+
+  copilot --agent agent-pr-review -p "Review the changes in this PR and provide feedback" --allow-all-tools --no-color -s 
 
   copilot --agent agent-pr-review \
     -p "${review_prompt}" \
@@ -291,9 +327,10 @@ usage() {
   usage:
   $(basename "$0") { option }
     options:
-      - hello_world        says hello to the world
+      - reqs               installs required tools and dependencies
       - build_bashutils    rebuild .bashutils by concatenating all files in sections/
       - pr_reviewer        runs Copilot PR reviewer and saves output to review_output.md
+      - get_pr_review_from_agent  runs the agent logic to get PR review (used by pr_reviewer)
 EOM
   exit 1
 }
@@ -302,14 +339,17 @@ EOM
 
 
 case "$1" in
-  hello_world)
-    hello_world
+  reqs)
+    reqs
     ;;
   build_bashutils)
     build_bashutils
     ;;
   pr_reviewer)
     pr_reviewer
+    ;;
+  get_pr_review_from_agent)
+    get_pr_review_from_agent
     ;;
   *)
     usage

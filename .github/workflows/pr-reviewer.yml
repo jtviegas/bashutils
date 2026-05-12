@@ -22,14 +22,14 @@ jobs:
         with:
           node-version: '22'
 
-      - name: Install Copilot CLI
-        run: npm install -g @github/copilot
+      - name: install requirements
+        run: ./helper.sh reqs
 
       - name: Run Agent Review
         id: agent-review
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: ./helper.sh pr_reviewer
+        run: ./helper.sh get_pr_review_from_agent
 
       - name: Post Comment to PR
         uses: actions/github-script@v7
