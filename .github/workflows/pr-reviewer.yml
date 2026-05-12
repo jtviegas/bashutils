@@ -32,7 +32,12 @@ jobs:
         run: |
           set -euo pipefail
           : "${COPILOT_AGENT_TOKEN:?COPILOT_AGENT_TOKEN secret is required}"
-          GITHUB_TOKEN="$COPILOT_AGENT_TOKEN" copilot /agent agent-pr-review "Review the changes in this PR and provide feedback" > review_output.md
+          test -f .github/agents/agent-pr-review.agent.md || { echo "Missing agent definition: .github/agents/agent-pr-review.agent.md"; exit 1; }
+
+          if ! GITHUB_TOKEN="$COPILOT_AGENT_TOKEN" copilot /agent agent-pr-review "Review the changes in this PR and provide feedback" > review_output.md; then
+            GITHUB_TOKEN="$COPILOT_AGENT_TOKEN" copilot agent agent-pr-review "Review the changes in this PR and provide feedback" > review_output.md
+          fi
+
           test -s review_output.md || { echo "Review output file is empty or could not be read"; exit 1; }
 
       - name: Post Comment to PR
