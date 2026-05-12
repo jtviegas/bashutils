@@ -41,7 +41,15 @@ jobs:
           copilot -i "/agent agent-pr-review \"${review_prompt}\"" > review_output.md 2>"${stderr_log}" || {
             rc=$?
             echo "Copilot agent review failed with exit code ${rc}. Captured stderr:"
-            cat "${stderr_log}"
+            if test -s "${stderr_log}"; then
+              cat "${stderr_log}"
+            else
+              echo "(stderr was empty)"
+            fi
+            if test -s review_output.md; then
+              echo "Captured stdout:"
+              cat review_output.md
+            fi
             rm -f "${stderr_log}"
             exit "${rc}"
           }
