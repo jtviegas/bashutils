@@ -204,6 +204,54 @@ build_bashutils(){
 
 # add your custom bash functions above this line
 
+pr_reviewer(){
+  local _pwd
+  _pwd=$(pwd)
+  cd "$this_folder" || return 1
+
+  : "${GITHUB_TOKEN:?GITHUB_TOKEN secret is required}"
+  test -f .github/agents/agent-pr-review.agent.md || { echo "Missing agent definition: .github/agents/agent-pr-review.agent.md"; cd "$_pwd" || return 1; return 1; }
+
+  local review_prompt stderr_log rc
+  review_prompt="Review the changes in this PR and provide feedback"
+  stderr_log="$(mktemp)"
+
+  copilot --agent agent-pr-review \
+    -p "${review_prompt}" \
+    --allow-all-tools \
+    --no-color \
+    -s > review_output.md 2>"${stderr_log}" || {
+    rc=$?
+    echo "Copilot agent review failed with exit code ${rc}. Captured stderr:"
+    if test -s "${stderr_log}"; then
+      cat "${stderr_log}"
+    else
+      echo "(stderr was empty)"
+    fi
+    if test -s review_output.md; then
+      echo "Captured stdout (last 200 lines):"
+      tail -n 200 review_output.md
+    fi
+    {
+      echo "⚠️ Copilot agent review failed (exit code ${rc})."
+      echo
+      echo "Check this workflow run logs for full details."
+    } > review_output.md
+    rm -f "${stderr_log}"
+    cd "$_pwd" || return 1
+    return 0
+  }
+
+  rm -f "${stderr_log}"
+  test -s review_output.md || {
+    echo "Review output file is empty or unreadable (Copilot command completed but produced no review output)."
+    cd "$_pwd" || return 1
+    return 1
+  }
+
+  cd "$_pwd" || return 1
+}
+
 # <=== MAIN SECTION END  <====
 
 # ===> FOOTER SECTION START  ===>
@@ -215,6 +263,7 @@ usage() {
     options:
       - hello_world        says hello to the world
       - build_bashutils    rebuild .bashutils by concatenating all files in sections/
+      - pr_reviewer        runs Copilot PR reviewer and saves output to review_output.md
 EOM
   exit 1
 }
@@ -228,6 +277,9 @@ case "$1" in
     ;;
   build_bashutils)
     build_bashutils
+    ;;
+  pr_reviewer)
+    pr_reviewer
     ;;
   *)
     usage
