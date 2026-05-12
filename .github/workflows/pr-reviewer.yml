@@ -49,7 +49,7 @@ jobs:
           rm -f "${stderr_log}"
 
           test -s review_output.md || {
-            echo "Review output file is empty or could not be read"
+            echo "Review output file is empty or unreadable (Copilot command completed but produced no review output)."
             exit 1
           }
 
