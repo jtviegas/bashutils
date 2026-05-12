@@ -27,7 +27,8 @@ the downloaded [`bashutils-template.sh`](./bashutils-template.sh) file is a regu
 
 - it creates `.variables`, `.local_variables` and `.secrets` next to the script when needed
 - it downloads `.bashutils` on the first run
-- on later runs it checks for updates at most once per day and replaces the local `.bashutils` only when a newer version exists on this repository `master` branch
+- on later runs it checks for updates at most once per day and replaces the local `.bashutils` from `master` only when newer
+- every downloaded `.bashutils` file is verified with SHA256 using `.bashutils.checksum`
 - you can add your own functions directly to the downloaded script and keep reusing the shared `.bashutils`
 
 ## starter script structure

@@ -200,6 +200,8 @@ aws_get_cloudfront_cidr(){
 
 aws_set_profile(){
   info "[aws_set_profile|in] ($1, $2, ${3:0:5}, $4, $5)"
+  local _pwd
+  _pwd=$(pwd)
 
   [ -z $1 ] && err "[aws_set_profile] missing argument PROFILE" && return 1
   local PROFILE="$1"
@@ -454,7 +456,7 @@ verify_env(){
   for arg in "$@"
   do
       debug "[verify_env] ... checking $arg"
-      if [ -z "$arg" ]; then err "[verify_env] please define env var: $arg" && return 1; fi
+      if [ -z "${!arg}" ]; then err "[verify_env] please define env var: $arg" && exit 1; fi
   done
   info "[verify_env] ...done."
 }
@@ -613,19 +615,22 @@ git_tag_and_push()
 
 ############################
 #   name: get_latest_tag
-#   purpose: fetches remote tags and prints the most recent tag; prints 0 if no tags exist
+#   purpose: retrieves the latest git tag from the repository
 #   parameters: none
-#   side-effects: sets global variable latest_tag
 ############################
 get_latest_tag() {
-  info "[get_latest_tag|in]"
+  info "[get_latest_tag|in]" >&2
   git fetch --tags > /dev/null 2>&1
-  latest_tag=$(git describe --tags --abbrev=0 2>/dev/null)
-  local result=0
-  if [ ! -z "$latest_tag" ]; then
-      result="$latest_tag"
+  local latest_tag
+  latest_tag="$(git describe --tags --abbrev=0 2>/dev/null)"
+  if [ -z "$latest_tag" ]; then
+    err "[get_latest_tag|out] => 1 (no tags found)" >&2
+    exit 1
   fi
-  info "[get_latest_tag|out] => ${result}"
+
+  echo "$latest_tag"
+  info "[get_latest_tag|out] => ${latest_tag}" >&2
+  return 0
 }
 
 ############################
