@@ -50,6 +50,5 @@ bats test
 (these last two _should not be included in versioning_, add them to `.gitignore` file)
   - it also defines handy logging functions
   - ...and downloads the `.bashutils` include file when needed
-  - ...and later checks for updates at most once per day, replacing that file from `master` when there is a newer version
-  - ...and verifies SHA256 integrity before replacing the local include file
-  - ...and gets expected SHA256 from `.bashutils.checksum`
+  - ...and later checks for updates at most once per day, replacing that file only when a newer version is available from this repository master branch
+- running `./helper.sh build_bashutils` rebuilds `.bashutils` by concatenating all section files under `sections/` in alphabetical order; keep section files free of top-level executable statements (function definitions only)
