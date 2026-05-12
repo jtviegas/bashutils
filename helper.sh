@@ -215,7 +215,6 @@ pr_reviewer(){
   info "[pr_reviewer|in]"
   local _pwd review_prompt stderr_log rc
   _pwd=$(pwd)
-  stderr_log=""
 
   _pr_reviewer_finish() {
     local code msg
@@ -224,19 +223,20 @@ pr_reviewer(){
     cd "$_pwd" || return 1
     [[ "$code" -ne 0 ]] && err "$msg" && return "$code"
     info "$msg"
+    return 0
   }
 
   if [ -z "${GITHUB_TOKEN:-}" ]; then
     err "GITHUB_TOKEN secret is required"
     _pr_reviewer_finish 1
-    return $?
+    return 1
   fi
 
   cd "$this_folder" || return 1
   if ! test -f .github/agents/agent-pr-review.agent.md; then
     err "Missing agent definition: .github/agents/agent-pr-review.agent.md"
     _pr_reviewer_finish 1
-    return $?
+    return 1
   fi
 
   review_prompt="Review the changes in this PR and provide feedback"
@@ -274,11 +274,12 @@ pr_reviewer(){
     err "Review output file is empty or unreadable (Copilot command completed but produced no review output)."
     [ -n "${stderr_log}" ] && rm -f "${stderr_log}"
     _pr_reviewer_finish 1
-    return $?
+    return 1
   fi
 
   [ -n "${stderr_log}" ] && rm -f "${stderr_log}"
   _pr_reviewer_finish 0
+  return 0
 }
 
 # <=== MAIN SECTION END  <====
