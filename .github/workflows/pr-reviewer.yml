@@ -36,14 +36,15 @@ jobs:
 
           review_prompt="Review the changes in this PR and provide feedback"
 
-          copilot -i "/agent agent-pr-review \"${review_prompt}\"" > review_output.md 2> review_error.log || {
-            cat review_error.log
+          copilot -i "/agent agent-pr-review \"${review_prompt}\"" > review_output.md 2>&1 || {
+            echo "Copilot agent review failed. Captured output:"
+            cat review_output.md
             exit 1
           }
 
           test -s review_output.md || {
             echo "Review output file is empty or could not be read"
-            cat review_error.log
+            cat review_output.md
             exit 1
           }
 
