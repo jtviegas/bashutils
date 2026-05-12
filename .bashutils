@@ -198,7 +198,7 @@ get_latest_tag() {
   local latest_tag
   latest_tag="$(git describe --tags --abbrev=0 2>/dev/null)"
   if [ -z "$latest_tag" ]; then
-    info "[get_latest_tag|out] => 1 (no tags found)"
+    err "[get_latest_tag|out] => 1 (no tags found)"
     return 1
   fi
 
