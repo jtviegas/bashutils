@@ -83,6 +83,7 @@ download_bashutils_if_newer() {
   local expected_sha256
   local download_url
   local release_json
+  local asset_name
 
   if [ -f "$bashutils" ] && [ -f "$bashutils_last_check" ]; then
     now_epoch=$(date +%s)
@@ -124,11 +125,12 @@ download_bashutils_if_newer() {
       fi
     fi
   else
+    asset_name="$(basename "$BASHUTILS_RELEASE_ASSET_URL")"
     release_json="$(curl -fsSL -H "User-Agent: bashutils-template" "$BASHUTILS_RELEASE_API_URL" 2>/dev/null)"
-    expected_sha256="$(printf '%s' "$release_json" | sed -n 's/.*"digest":"sha256:\([a-f0-9]\{64\}\)".*/\1/p' | head -n 1)"
+    expected_sha256="$(printf '%s' "$release_json" | tr '{' '\n' | grep "\"name\":\"$asset_name\"" | sed -n 's/.*"digest":"sha256:\([a-f0-9]\{64\}\)".*/\1/p' | head -n 1)"
     if [ -n "$expected_sha256" ]; then
       if ! command -v tar >/dev/null 2>&1; then
-        err "[download_bashutils_if_newer] please install tar"
+        err "[download_bashutils_if_newer] please install tar with bzip2 support"
         rm -f "$bashutils_tmp"
         return 1
       fi
@@ -162,6 +164,11 @@ download_bashutils_if_newer() {
       warn "[download_bashutils_if_newer] failed to resolve latest release checksum, using bootstrap artifact"
       download_url="$BASHUTILS_BOOTSTRAP_URL"
       expected_sha256="$BASHUTILS_BOOTSTRAP_SHA256"
+      if [ -z "$expected_sha256" ]; then
+        err "[download_bashutils_if_newer] expected checksum is empty for bootstrap $INCLUDE_FILE"
+        rm -f "$bashutils_tmp"
+        return 1
+      fi
       if [ ! -f "$bashutils" ]; then
         if ! curl -fsSL -R "$download_url" -o "$bashutils_tmp"; then
           err "[download_bashutils_if_newer] failed to download bootstrap $INCLUDE_FILE"
