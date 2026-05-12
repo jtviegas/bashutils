@@ -101,11 +101,7 @@ download_bashutils_if_newer() {
     return 1
   fi
 
-  if command -v sha256sum >/dev/null 2>&1; then
-    true
-  elif command -v shasum >/dev/null 2>&1; then
-    true
-  else
+  if ! command -v sha256sum >/dev/null 2>&1 && ! command -v shasum >/dev/null 2>&1; then
     err "[download_bashutils_if_newer] please install sha256sum or shasum to verify $INCLUDE_FILE"
     return 1
   fi
@@ -119,7 +115,7 @@ download_bashutils_if_newer() {
       rm -f "$checksum_tmp"
       return 1
     fi
-    expected_sha256="$(awk -v include_file="$INCLUDE_FILE" '$2 == include_file && $1 ~ /^[a-fA-F0-9]{64}$/ { print tolower($1); exit }' "$checksum_tmp")"
+    expected_sha256="$(awk -v include_file="$INCLUDE_FILE" 'NF >= 2 && $2 == include_file && $1 ~ /^[a-fA-F0-9]{64}$/ { print tolower($1); exit }' "$checksum_tmp")"
     rm -f "$checksum_tmp"
     if [ -z "$expected_sha256" ]; then
       err "[download_bashutils_if_newer] invalid checksum file format from $(basename "$BASHUTILS_CHECKSUM_URL")"

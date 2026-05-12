@@ -200,9 +200,8 @@ build_bashutils(){
     return 1
   fi
 
-  local result="$?"
+  local result="0"
   local msg="[build_bashutils|out] => ${result}"
-  [[ "$result" -ne 0 ]] && err "$msg" && return 1
   info "$msg"
 }
 
