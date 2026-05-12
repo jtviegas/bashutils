@@ -27,6 +27,7 @@ jobs:
 
       - name: Run Agent Review
         id: agent-review
+        shell: bash
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
