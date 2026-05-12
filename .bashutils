@@ -615,19 +615,22 @@ git_tag_and_push()
 
 ############################
 #   name: get_latest_tag
-#   purpose: fetches remote tags and prints the most recent tag; prints 0 if no tags exist
+#   purpose: retrieves the latest git tag from the repository
 #   parameters: none
-#   side-effects: sets global variable latest_tag
 ############################
 get_latest_tag() {
-  info "[get_latest_tag|in]"
+  info "[get_latest_tag|in]" >&2
   git fetch --tags > /dev/null 2>&1
-  latest_tag=$(git describe --tags --abbrev=0 2>/dev/null)
-  local result=0
-  if [ ! -z "$latest_tag" ]; then
-      result="$latest_tag"
+  local latest_tag
+  latest_tag="$(git describe --tags --abbrev=0 2>/dev/null)"
+  if [ -z "$latest_tag" ]; then
+    err "[get_latest_tag|out] => 1 (no tags found)" >&2
+    exit 1
   fi
-  info "[get_latest_tag|out] => ${result}"
+
+  echo "$latest_tag"
+  info "[get_latest_tag|out] => ${latest_tag}" >&2
+  return 0
 }
 
 ############################
