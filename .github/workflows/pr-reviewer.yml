@@ -34,10 +34,19 @@ jobs:
           : "${COPILOT_AGENT_TOKEN:?COPILOT_AGENT_TOKEN secret is required}"
           test -f .github/agents/agent-pr-review.agent.md || { echo "Missing agent definition: .github/agents/agent-pr-review.agent.md"; exit 1; }
 
-          if ! GITHUB_TOKEN="$COPILOT_AGENT_TOKEN" copilot /agent agent-pr-review "Review the changes in this PR and provide feedback" > review_output.md; then
-            GITHUB_TOKEN="$COPILOT_AGENT_TOKEN" copilot agent agent-pr-review "Review the changes in this PR and provide feedback" > review_output.md
+          local_prompt="Review the changes in this PR and provide feedback"
+
+          if GITHUB_TOKEN="$COPILOT_AGENT_TOKEN" copilot /agent agent-pr-review "$local_prompt" > review_output.md 2> review_error.log; then
+            :
+          elif GITHUB_TOKEN="$COPILOT_AGENT_TOKEN" copilot agent agent-pr-review "$local_prompt" > review_output.md 2>> review_error.log; then
+            :
+          else
+            echo "Copilot CLI failed with both '/agent' and 'agent' syntaxes"
+            cat review_error.log
+            exit 1
           fi
 
+          rm -f review_error.log
           test -s review_output.md || { echo "Review output file is empty or could not be read"; exit 1; }
 
       - name: Post Comment to PR
