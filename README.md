@@ -35,6 +35,14 @@ the downloaded [`bashutils-template.sh`](./bashutils-template.sh) file is a regu
 
 the starter script already includes the same header / main / footer layout that was previously shown inline in this README, including a `hello_world` example that you can replace with your own commands.
 
+## tests
+
+this repository uses [bats-core](https://github.com/bats-core/bats-core) for tests:
+
+```bash
+bats test
+```
+
 ## notes
 
 - the starter script header tries to:
