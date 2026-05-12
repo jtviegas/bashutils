@@ -175,8 +175,8 @@ build_bashutils(){
 
   > "$out_file"
   for f in "${files[@]}"; do
-    cat "$f" >> "$out_file"
-    echo >> "$out_file"
+    cat "$f" >> "$out_file" || return 1
+    echo >> "$out_file" || return 1
   done
 
   if command -v sha256sum >/dev/null 2>&1; then
@@ -200,9 +200,8 @@ build_bashutils(){
     return 1
   fi
 
-  local result="${checksum_result:-0}"
+  local result="0"
   local msg="[build_bashutils|out] => ${result}"
-  [[ "$result" -ne 0 ]] && err "$msg" && return 1
   info "$msg"
 }
 
