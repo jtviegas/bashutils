@@ -47,8 +47,8 @@ jobs:
               echo "(stderr was empty)"
             fi
             if test -s review_output.md; then
-              echo "Captured stdout:"
-              cat review_output.md
+              echo "Captured stdout (last 200 lines):"
+              tail -n 200 review_output.md
             fi
             rm -f "${stderr_log}"
             exit "${rc}"
