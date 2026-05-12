@@ -35,6 +35,17 @@ the downloaded [`bashutils-template.sh`](./bashutils-template.sh) file is a regu
 
 the starter script already includes the same header / main / footer layout that was previously shown inline in this README, including a `hello_world` example that you can replace with your own commands.
 
+## contributing
+
+- treat `sections/` as the source of truth for `.bashutils`
+- after updating `sections/`, regenerate `.bashutils` with:
+
+```bash
+./build_bashutils
+```
+
+- commit both the changed `sections/*` source files and the rebuilt `.bashutils` file in the same commit/PR
+
 ## tests
 
 this repository uses [bats-core](https://github.com/bats-core/bats-core) for tests:
