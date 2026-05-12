@@ -36,9 +36,8 @@ jobs:
 
           review_prompt="Review the changes in this PR and provide feedback"
 
-          copilot -i "/agent agent-pr-review \"${review_prompt}\"" > review_output.md 2>&1 || {
-            echo "Copilot agent review failed. Captured output:"
-            cat review_output.md
+          copilot -i "/agent agent-pr-review \"${review_prompt}\"" > review_output.md 2> >(tee /dev/stdout) || {
+            echo "Copilot agent review failed."
             exit 1
           }
 
