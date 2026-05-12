@@ -143,18 +143,23 @@ download_bashutils_if_newer || exit 1
 
 # ===> MAIN SECTION START  ===>
 
-hello_world(){
-  info "[hello_world|in]"
-  local _pwd
-  _pwd=$(pwd)
+reqs(){
+  info "[reqs|in]"
+  _pwd=`pwd`
   cd "$this_folder"
 
-  echo "hello world"
-  local result="$?"
+  local result="0"
+
+  which copilot > /dev/null 2>&1
+  if [ ! "$?" -eq "0" ] ; then
+    info "[reqs] installing copilot ..."
+    npm install -g @github/copilot
+    result="$?"
+  fi
 
   cd "$_pwd"
-  local msg="[hello_world|out] => ${result}"
-  [[ "$result" -ne 0 ]] && err "$msg" && exit 1
+  local msg="[reqs|out] => ${result}"
+  [[ ! "$result" -eq "0" ]] && info "$msg" && exit 1
   info "$msg"
 }
 
@@ -202,6 +207,7 @@ build_bashutils(){
   info "[build_bashutils|out] => 0"
 }
 
+
 # add your custom bash functions above this line
 
 # <=== MAIN SECTION END  <====
@@ -213,7 +219,7 @@ usage() {
   usage:
   $(basename "$0") { option }
     options:
-      - hello_world        says hello to the world
+      - reqs               installs required tools and dependencies
       - build_bashutils    rebuild .bashutils by concatenating all files in sections/
 EOM
   exit 1
@@ -223,8 +229,8 @@ EOM
 
 
 case "$1" in
-  hello_world)
-    hello_world
+  reqs)
+    reqs
     ;;
   build_bashutils)
     build_bashutils
