@@ -193,17 +193,17 @@ git_tag_and_push()
 #   parameters: none
 ############################
 get_latest_tag() {
-  info "[get_latest_tag|in]"
+  info "[get_latest_tag|in]" >&2
   git fetch --tags > /dev/null 2>&1
   local latest_tag
   latest_tag="$(git describe --tags --abbrev=0 2>/dev/null)"
   if [ -z "$latest_tag" ]; then
-    err "[get_latest_tag|out] => 1 (no tags found)"
+    err "[get_latest_tag|out] => 1 (no tags found)" >&2
     return 1
   fi
 
   echo "$latest_tag"
-  info "[get_latest_tag|out] => ${latest_tag}"
+  info "[get_latest_tag|out] => ${latest_tag}" >&2
   return 0
 }
 
