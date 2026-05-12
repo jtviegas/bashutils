@@ -130,8 +130,10 @@ call_grafana_api(){
   AZURE_ACCESS_TOKEN="$1"
   [ -z $2 ] && err "[call_grafana_api] missing argument GRAFANA_API_TOKEN" && exit 1
   GRAFANA_API_TOKEN="$2"
+  [ -z $3 ] && err "[call_grafana_api] missing argument GRAFANA_API_URL" && exit 1
+  GRAFANA_API_URL="$3"
 
-  local response=$(curl -s -X GET "https://api.bifrost.heimdall.novonordisk.cloud/grafana/api/org"  \
+  local response=$(curl -s -X GET "$GRAFANA_API_URL"  \
       -H "Authorization: Bearer ${AZURE_ACCESS_TOKEN}" \
       -H "X-Bifrost-Grafana-SA: Bearer ${GRAFANA_API_TOKEN}" )
   result="$?"
