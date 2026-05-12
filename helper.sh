@@ -162,6 +162,7 @@ build_bashutils(){
   info "[build_bashutils|in]"
   local sections_dir="$this_folder/sections"
   local out_file="$this_folder/$INCLUDE_FILE"
+  local out_checksum_file="$this_folder/${INCLUDE_FILE}.checksum"
 
   [ ! -d "$sections_dir" ] && err "[build_bashutils] sections folder not found: $sections_dir" && return 1
 
@@ -174,6 +175,21 @@ build_bashutils(){
     cat "$f" >> "$out_file"
     echo >> "$out_file"
   done
+
+  if command -v sha256sum >/dev/null 2>&1; then
+    (
+      cd "$this_folder" || return 1
+      sha256sum "$INCLUDE_FILE" > "$(basename "$out_checksum_file")"
+    ) || return 1
+  elif command -v shasum >/dev/null 2>&1; then
+    (
+      cd "$this_folder" || return 1
+      shasum -a 256 "$INCLUDE_FILE" > "$(basename "$out_checksum_file")"
+    ) || return 1
+  else
+    err "[build_bashutils] please install sha256sum or shasum to generate checksum file"
+    return 1
+  fi
 
   local result="$?"
   local msg="[build_bashutils|out] => ${result}"
@@ -214,4 +230,3 @@ case "$1" in
 esac
 
 # <=== FOOTER SECTION END  <===
-
