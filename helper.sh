@@ -227,7 +227,7 @@ prompt_copilot_agent(){
   copilot --agent pr-reviewer \
     -p "${review_prompt}" \
     --allow-all-tools \
-    --no-color -s
+    --no-color
   #  -s > review_output.md 2>"${stderr_log}"
   result="$?"
   #cat review_output.md
