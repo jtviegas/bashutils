@@ -863,3 +863,36 @@ poetry_publish_pip(){
   [[ ! "$result" -eq "0" ]] && info "$msg" && exit 1
   info "$msg"
 }
+
+pyproj_report_header(){
+  info "[pyproj_report_header|in] ($1)"
+
+  [[ -z "$1" ]] && err "[pyproj_report_header] must provide DOCNAME" && exit 1
+  local DOCNAME="$1"
+
+  [[ -z "$2" ]] && err "[pyproj_report_header] must provide REPO" && exit 1
+  local REPO="$2"
+
+  [[ -z "$3" ]] && err "[pyproj_report_header] must provide BRANCH" && exit 1
+  local BRANCH="$3"
+
+  [[ -z "$4" ]] && err "[pyproj_report_header] must provide COMMIT" && exit 1
+  local COMMIT="$4"
+
+  _pwd=`pwd`
+  cd "$this_folder"
+
+  local version=$(uv run python -c "import tomllib; d=tomllib.load(open('pyproject.toml','rb')); print(d['project']['version'])")
+  local package=$(uv run python -c "import tomllib; d=tomllib.load(open('pyproject.toml','rb')); print(d['project']['name'])")
+
+  echo "## Test Report " > "${DOCNAME}"
+  echo "Package: ${package}" >> "$DOCNAME"
+  echo "Version: ${version}" >> "$DOCNAME"
+  echo "Timestamp: $(date)" >> "$DOCNAME"
+  echo "Repository: ${REPO}" >> "$DOCNAME"  
+  echo "Branch: ${BRANCH}" >> "$DOCNAME"
+  echo "Commit id: ${COMMIT}" >> "$DOCNAME"
+  
+  cd "$_pwd"
+  info "[pyproj_report_header|out]"
+}
