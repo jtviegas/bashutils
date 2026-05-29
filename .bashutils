@@ -817,6 +817,23 @@ print_uuid(){
   echo "[print_uuid|out]"
 }
 
+
+
+collect_dot_git(){
+  info "[collect_dot_git|in] ($1)"
+  _pwd=`pwd`
+  cd "$this_folder"
+
+  local OUTPUT_FILE="${1:-git.tar.gz}"
+  tar czpvf "$OUTPUT_FILE" .git 
+  local result="$?"
+
+  cd "$_pwd"
+  local msg="[collect_dot_git|out] => ${result}"
+  [[ ! "$result" -eq "0" ]] && info "$msg" && exit 1
+  info "$msg"
+}
+
 ##########################################
 #######     ------- cdk -------    #######
 ##########################################
