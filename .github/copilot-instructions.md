@@ -31,16 +31,17 @@ bashutils/
 ├── README.md
 ├── LICENSE
 ├── sections/                # SOURCE OF TRUTH for .bashutils content
-│   ├── bash.sh              # foundational utilities (must be first in build order)
-│   ├── commons.sh           # cheat-sheet printer
-│   ├── terraform.sh
-│   ├── js.sh
+│   ├── 00-bashutils         # foundational utilities — sorts first, must be included before all *.sh files
+│   ├── assorted.sh
 │   ├── aws.sh
-│   ├── cdk.sh
-│   ├── python.sh
 │   ├── azure.sh
+│   ├── bash.sh              # legacy copy of foundational utilities (kept for reference)
+│   ├── cdk.sh
+│   ├── commons.sh           # cheat-sheet printer
 │   ├── databricks.sh
-│   └── assorted.sh
+│   ├── js.sh
+│   ├── python.sh
+│   └── terraform.sh
 └── test/
     └── bashutils-template.bats   # bats-core integration tests for the template script
 ```
@@ -169,7 +170,11 @@ Every `sections/*.sh` file must start with the canonical three-line section head
 
 ## Build notes
 
-`build_bashutils` currently concatenates `sections/*.sh` in alphabetical glob order. The `bash` section contains foundation functions (`verify_prereqs`, `verify_env`, `info`, `err`, etc.) used by every other section. `bash.sh` sorts 4th alphabetically — this is a known fragility (tracked issue). Until a proper ordering mechanism is in place, **do not introduce top-level executable code** (outside function bodies) in any section file.
+`build_bashutils` concatenates section files in sorted order. The canonical ordering mechanism is the `sections/00-bashutils` file, which contains foundation functions (`verify_prereqs`, `verify_env`, `info`, `err`, etc.) used by every other section. Its `00-` prefix guarantees it sorts before all `*.sh` files.
+
+**Important:** `build_bashutils` currently uses the glob `sections/*.sh`, which does **not** match `00-bashutils` (no `.sh` extension). The function must be updated to prepend `sections/00-bashutils` explicitly before the `*.sh` glob, or `00-bashutils` must be renamed to `00-bash.sh`. Until this is resolved, `00-bashutils` is not included in the build output.
+
+Do not introduce top-level executable code (outside function bodies) in any section file.
 
 ### helper.sh command reference
 

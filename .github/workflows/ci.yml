@@ -13,12 +13,11 @@ jobs:
       - uses: actions/checkout@v4
       - name: install bats-core
         run: |
-          sudo apt-get update
-          sudo apt-get install -y bats
+          ./helper.sh reqs
       - name: bash syntax check
         run: bash -n bashutils-template.sh
       - name: run bats tests
-        run: bats test
+        run: ./helper.sh test
       - name: Verify .bashutils is up to date
         run: |
           ./helper.sh build_bashutils

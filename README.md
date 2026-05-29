@@ -3,6 +3,8 @@ bash scripting utilities include file
 
 ## usage
 
+### option a) 
+
 include the file in your bash script:
 
 `. ${this_folder}/.bashutils`
@@ -13,35 +15,59 @@ where `this_folder` is the directory containing your script, resolved at runtime
 this_folder="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 ```
 
-This variable is already set up for you in the starter script (see below).
+you can also now add the rest of the plumbing, found in the `helper.sh` script below, to be able to update the `.bashutils` file seamlessly.
+
+### option b) 
+
+create a new `helper.sh` script for your project that already includes and updastes `.bashutils` (see [one-liner setup](#one-liner-setup))
+
 
 ## one-liner setup
 
-download a starter script for a new project with:
+download a helper script for a new project with:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/jtviegas/bashutils/master/bashutils-template.sh -o ./helper.sh && chmod +x ./helper.sh
 ```
 
-the downloaded [`bashutils-template.sh`](./bashutils-template.sh) file is a regular bash script that you can rename and customize for your project.
+if eventually you experience issues with the corporation proxy, you still have 2 options:
+
+- try the api:
+
+```bash
+curl -fsSL "https://api.github.com/repos/jtviegas/bashutils/contents/bashutils-template.sh" \
+  | python3 -c "import sys,json,base64; print(base64.b64decode(json.load(sys.stdin)['content']).decode())" \
+    > ./helper.sh && chmod +x ./helper.sh
+```
+
+- try using the `gh` cli:
+
+```bash
+gh api repos/jtviegas/bashutils/contents/bashutils-template.sh \
+  --jq '.content' | base64 -d > ./helper.sh && chmod +x ./helper.sh
+```
+
+the downloaded file is a regular bash script that you can rename and customize for your project.
 
 - it creates `.variables`, `.local_variables` and `.secrets` next to the script when needed
 - it downloads `.bashutils` on the first run
+- it provides a set of logging functions
 - on later runs it checks for updates at most once per day and replaces the local `.bashutils` from `master` only when newer
 - every downloaded `.bashutils` file is verified with SHA256 using `.bashutils.checksum`
 - you can add your own functions directly to the downloaded script and keep reusing the shared `.bashutils`
 
-## starter script structure
-
-the starter script already includes the same header / main / footer layout that was previously shown inline in this README, including a `hello_world` example that you can replace with your own commands.
 
 ## contributing
 
+- requirements:
+  - bash
+  - sha256sum
+  - python 3
 - treat `sections/` as the source of truth for `.bashutils`
 - after updating `sections/`, regenerate `.bashutils` with:
 
 ```bash
-./build_bashutils
+./helper.sh build_bashutils
 ```
 
 - commit both the changed `sections/*` source files and the rebuilt `.bashutils` file in the same commit/PR
@@ -53,13 +79,3 @@ this repository uses [bats-core](https://github.com/bats-core/bats-core) for tes
 ```bash
 bats test
 ```
-
-## notes
-
-- the starter script header tries to:
-  - include variables and secrets into the running environment through the files `.variables`, `.local_variables` (for local user specific variables) and `.secrets` in this order 
-(these last two _should not be included in versioning_, add them to `.gitignore` file)
-  - it also defines handy logging functions
-  - ...and downloads the `.bashutils` include file when needed
-  - ...and later checks for updates at most once per day, replacing that file only when a newer version is available from this repository master branch
-- running `./helper.sh build_bashutils` rebuilds `.bashutils` by concatenating all section files under `sections/` in alphabetical order; keep section files free of top-level executable statements (function definitions only)
