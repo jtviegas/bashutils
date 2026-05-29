@@ -697,8 +697,6 @@ proj_code_transfer(){
   [ -z $6 ] && err "[proj_code_transfer] missing argument CODE_TRANSFER_IMPORT_REPLACEMENT_TARGET" && exit 1
   local CODE_TRANSFER_IMPORT_REPLACEMENT_TARGET="$6"
 
-
-
    _pwd=`pwd`
   cd "$this_folder"
 

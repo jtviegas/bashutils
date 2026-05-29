@@ -115,7 +115,7 @@ download_bashutils_if_newer() {
 
   checksum_tmp="$(mktemp)"
   if ! curl -fsSL "$BASHUTILS_CHECKSUM_URL" \
-    | python3 -c "import sys,json,base64; print(base64.b64decode(json.load(sys.stdin)['content']).decode())" \
+    | python3 -c "import sys,json,base64; sys.stdout.buffer.write(base64.b64decode(json.load(sys.stdin)['content']))" \
     > "$checksum_tmp"; then
     err "[download_bashutils_if_newer] failed to download $(basename "$BASHUTILS_CHECKSUM_URL")"
     rm -f "$checksum_tmp"
@@ -143,16 +143,16 @@ download_bashutils_if_newer() {
   if [ "$just_fetch" -eq "1" ]; then
     bashutils_tmp="$(mktemp)"
     curl -fsSL "$BASHUTILS_URL" \
-      | python3 -c "import sys,json,base64; print(base64.b64decode(json.load(sys.stdin)['content']).decode())" \
+      | python3 -c "import sys,json,base64; sys.stdout.buffer.write(base64.b64decode(json.load(sys.stdin)['content']))" \
       > "$bashutils_tmp"
     if [ ! "$?" -eq "0" ]; then
       err "[download_bashutils_if_newer] failed to download $INCLUDE_FILE"
       rm -f "$bashutils_tmp"
       return 1
     fi
-    info "[download_bashutils_if_newer] downloaded $INCLUDE_FILE"
+    info "[download_bashutils_if_newer] downloaded $INCLUDE_FILE to $bashutils_tmp"
     actual_sha256="$(sha256sum "$bashutils_tmp" | awk '{print $1}')"
-    info "[download_bashutils_if_newer] actual_sha256: $actual_sha256 (file: $bashutils_tmp)"
+    info "[download_bashutils_if_newer] actual_sha256: $actual_sha256"
 
     if [ "$actual_sha256" != "$expected_sha256" ]; then
       info "[download_bashutils_if_newer] $INCLUDE_FILE checksum is not equal to the expected one (actual: $actual_sha256, expected: $expected_sha256), aborting update"
