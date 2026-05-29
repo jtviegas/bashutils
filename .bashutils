@@ -834,6 +834,37 @@ collect_dot_git(){
   info "$msg"
 }
 
+create_release_documentation(){
+  info "[create_release_documentation|in] ($1, $2, $3, $4)"
+
+  local GIT_TAR="$1"
+  local PRS_PDF="$2"
+  local QA_PDF="$3"
+  local TARGET_DIR="$4"
+
+  if [ -z "$GIT_TAR" ] || [ -z "$PRS_PDF" ] || [ -z "$QA_PDF" ] || [ -z "$TARGET_DIR" ]; then
+    err "[create_release_documentation] missing required arguments: GIT_TAR, PRS_PDF, QA_PDF, TARGET_DIR" && exit 1
+  fi
+
+  _pwd=`pwd`
+  cd "$this_folder"
+
+  rm -f "$TARGET_DIR/*"
+  mkdir -p "$TARGET_DIR"
+  mv "$GIT_TAR" "$TARGET_DIR/"
+  mv "$PRS_PDF" "$TARGET_DIR/"
+  mv "$QA_PDF" "$TARGET_DIR/"
+
+  tar czpvf "${TARGET_DIR}.tar.gz" "$TARGET_DIR" 
+  local result="$?"
+  cd "$_pwd"
+
+  local msg="[create_release_documentation|out] => ${result}"
+  [[ ! "$result" -eq "0" ]] && info "$msg" && exit 1
+  info "$msg"
+}
+
+
 ##########################################
 #######     ------- cdk -------    #######
 ##########################################
