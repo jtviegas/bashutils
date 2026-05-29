@@ -79,7 +79,6 @@ download_bashutils_if_newer() {
   local checksum_tmp
   local actual_sha256
   local expected_sha256
-
   
   if [ -f "$bashutils" ] && [ -f "$bashutils_last_check" ]; then
     now_epoch=$(date +%s)
@@ -173,7 +172,7 @@ source_if_exists "$this_folder/$FILE_LOCAL_VARIABLES"
 source_if_exists "$this_folder/$FILE_SECRETS"
 
 # ---------- include bashutils ----------
-download_bashutils_if_newer || exit 1
+[ -z "$BASHUTILS_DONT_UPDATE" ] && download_bashutils_if_newer
 . "$this_folder/$INCLUDE_FILE"
 
 # <=== HEADER SECTION END  <===
