@@ -433,6 +433,23 @@ lint_check_ruff(){
   info "$msg"
 }
 
+lint_check_ruff_uv(){
+  info "[lint_check_ruff_uv|in]"
+  _pwd=`pwd`
+
+  cd "$this_folder"
+
+  uv run ruff check
+  local result="$?"
+  if [ ! "$result" -eq "0" ] ; then err "[lint_check_ruff_uv] ruff linter check had issues"; fi
+
+  cd "$_pwd"
+
+  local msg="[lint_check_ruff_uv|out] => ${result}"
+  [[ ! "$result" -eq "0" ]] && info "$msg" && exit 1
+  info "$msg"
+}
+
 ############################
 #   name: poetry_pytest_unit
 #   purpose: runs pytest unit tests via poetry with coverage reporting (term-missing, html, xml) and JUnit XML output
@@ -464,6 +481,30 @@ poetry_pytest_unit(){
   cd "$_pwd"
 
   local msg="[poetry_pytest_unit|out] => ${result}"
+  [[ ! "$result" -eq "0" ]] && info "$msg" && exit 1
+  info "$msg"
+}
+
+pytest_uv(){
+  info "[pytest_uv|in] ($1, $2)"
+
+  local TEST_DIR="${1:-test}"
+  local SRC_DIR="${2:-src}"
+
+  _pwd=`pwd`
+  cd "$this_folder"
+
+  uv run pytest "$TEST_DIR" -x -s -vv --durations=0 \
+    --cov="$SRC_DIR" \
+    --cov-report=term-missing \
+    --cov-report=html \
+    --cov-report=xml \
+    --junitxml=unit-tests-results.xml
+  local result="$?"
+  [[ ! "$result" -eq "0" ]] && err "[pytest_uv] tests failed"
+  cd "$_pwd"
+
+  local msg="[pytest_uv|out] => ${result}"
   [[ ! "$result" -eq "0" ]] && info "$msg" && exit 1
   info "$msg"
 }
@@ -523,6 +564,19 @@ python_poetry_print_coverage()
   return ${result}
 }
 
+test_print_coverage_uv()
+{
+  info "[test_print_coverage_uv|in]"
+  
+  uv run coverage report --show-missing
+  uv run coverage html
+  uv run coverage xml
+  result="$?"
+  [ "$result" -ne "0" ] && exit 1
+  info "[test_print_coverage_uv|out] => $result"
+  return ${result}
+}
+
 ############################
 #   name: python_poetry_check_coverage
 #   purpose: asserts that the total coverage percentage from 'poetry run coverage report' meets a minimum threshold; exits with error if below
@@ -546,6 +600,23 @@ python_poetry_check_coverage()
   info "[python_poetry_check_coverage|out] => $score"
 }
 
+test_coverage_check_uv()
+{
+  info "[test_coverage_check_uv|in] ($1)"
+  [ -z "$1" ] && usage
+
+  local threshold=$1
+  score=$(uv run coverage report | awk '$1 == "TOTAL" {print $NF+0}')
+  result="$?"
+  [ "$result" -ne "0" ] && exit 1
+  if (( $threshold > $score )); then
+    err "[test_coverage_check_uv] $score doesn't meet $threshold"
+    exit 1
+  fi
+  uv run genbadge coverage -i coverage.xml -o coverage.svg
+  info "[test_coverage_check_uv|out] => $score"
+}
+
 ############################
 #   name: poetry_build
 #   purpose: generates a CHANGELOG, cleans dist/ and builds the package using 'poetry build'
@@ -565,6 +636,23 @@ poetry_build(){
 
   cd "$_pwd"
   local msg="[poetry_build|out] => ${result}"
+  [[ ! "$result" -eq "0" ]] && info "$msg" && exit 1
+  info "$msg"
+}
+
+build_uv(){
+  info "[build_uv|in]"
+
+  _pwd=`pwd`
+  cd "$this_folder"
+  # changelog
+  rm -rf dist/*
+  uv build
+  local result="$?"
+  [[ ! "$result" -eq "0" ]] && err "[build_uv] build failed"
+
+  cd "$_pwd"
+  local msg="[build_uv|out] => ${result}"
   [[ ! "$result" -eq "0" ]] && info "$msg" && exit 1
   info "$msg"
 }
@@ -599,6 +687,22 @@ poetry_publish_az(){
 
   cd "$_pwd"
   local msg="[poetry_publish_az|out] => ${result}"
+  [[ ! "$result" -eq "0" ]] && info "$msg" && exit 1
+  info "$msg"
+}
+
+publish_pypi_uv(){
+  info "[publish_pypi_uv|in]"
+
+  _pwd=`pwd`
+  cd "$this_folder"
+
+  uv publish --token "$PYPI_TOKEN"
+  local result="$?"
+  [[ ! "$result" -eq "0" ]] && err "[publish_pypi_uv] publish failed"
+
+  cd "$_pwd"
+  local msg="[publish_pypi_uv|out] => ${result}"
   [[ ! "$result" -eq "0" ]] && info "$msg" && exit 1
   info "$msg"
 }
@@ -661,6 +765,27 @@ sca_check_safety(){
   info "$msg"
 }
 
+sca_check_safety_uv(){
+  info "[sca_check_safety_uv|in] (${1:0:7})"
+  _pwd=`pwd`
+
+  [ -z $1 ] && err "[sca_check_safety_uv] missing argument SAFETY_KEY" && exit 1
+  local SAFETY_KEY="$1"
+
+  local result=0
+  cd "$this_folder"
+
+  # Run safety scan with continue-on-error flag
+  uv run safety --key "$SAFETY_KEY" scan --detailed-output --continue-on-error || true
+  local result="$?"
+
+  cd "$_pwd"
+
+  local msg="[sca_check_safety_uv|out] => ${result}"
+  [[ ! "$result" -eq "0" ]] && info "$msg" && exit 1
+  info "$msg"
+}
+
 ############################
 #   name: sast_check_bandit
 #   purpose: runs a Static Application Security Testing (SAST) scan with bandit to detect common security issues in Python source code
@@ -684,6 +809,26 @@ sast_check_bandit(){
   cd "$_pwd"
 
   local msg="[sast_check_bandit|out] => ${result}"
+  [[ ! "$result" -eq "0" ]] && info "$msg" && exit 1
+  info "$msg"
+}
+
+sast_check_bandit_uv(){
+  info "[sast_check_bandit_uv|in] ($1)"
+  _pwd=`pwd`
+
+  [ -z $1 ] && err "[sast_check_bandit_uv] missing argument SRC_DIR" && exit 1
+  local SRC_DIR="$1"
+
+  cd "$this_folder"
+
+  uv run bandit -r $SRC_DIR
+  local result="$?"
+  if [ ! "$result" -eq "0" ] ; then err "[sast_check_bandit_uv] code check had issues"; fi
+
+  cd "$_pwd"
+
+  local msg="[sast_check_bandit_uv|out] => ${result}"
   [[ ! "$result" -eq "0" ]] && info "$msg" && exit 1
   info "$msg"
 }
