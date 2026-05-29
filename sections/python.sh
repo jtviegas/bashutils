@@ -692,7 +692,10 @@ poetry_publish_az(){
 }
 
 publish_pypi_uv(){
-  info "[publish_pypi_uv|in]"
+  info "[publish_pypi_uv|in] (${1:0:7})"
+
+  [ -z $1 ] && err "[publish_pypi_uv] missing argument PYPI_TOKEN" && exit 1
+  local PYPI_TOKEN="$1"
 
   _pwd=`pwd`
   cd "$this_folder"
