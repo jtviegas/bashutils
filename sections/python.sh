@@ -896,3 +896,15 @@ pyproj_report_header(){
   cd "$_pwd"
   info "[pyproj_report_header|out]"
 }
+
+generate_pr_approvals_pdf() {
+  local repo="$1"
+  local branch="$2"
+  local output_file="$3"
+
+  if [ -z "$repo" ] || [ -z "$branch" ] || [ -z "$output_file" ]; then
+    usage
+  fi
+
+  uv run python -c "from tgedr_pycommons.cicd.pr_approvals_github import generate_pr_approvals_pdf; generate_pr_approvals_pdf('$repo', '$branch', '$output_file')"
+}
