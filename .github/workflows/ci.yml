@@ -6,7 +6,7 @@ on:
 
 jobs:
   verify-bashutils:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: read
     steps:
@@ -15,7 +15,8 @@ jobs:
         run: |
           ./helper.sh reqs
       - name: bash syntax check
-        run: bash -n bashutils-template.sh
+        run: |
+          bash -n bashutils-template.sh && bash -n .bashutils
       - name: run bats tests
         run: ./helper.sh test
       - name: Verify .bashutils is up to date
