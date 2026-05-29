@@ -903,8 +903,19 @@ generate_pr_approvals_pdf() {
   local output_file="$3"
 
   if [ -z "$repo" ] || [ -z "$branch" ] || [ -z "$output_file" ]; then
-    usage
+    err "[generate_pr_approvals_pdf] missing required arguments: repo, branch, output_file" && exit 1
   fi
 
   uv run python -c "from tgedr_pycommons.cicd.pr_approvals_github import generate_pr_approvals_pdf; generate_pr_approvals_pdf('$repo', '$branch', '$output_file')"
+}
+
+generate_quality_report_pdf() {
+  local input_md="$1"
+  local output_pdf="$2"
+
+  if [ -z "$input_md" ] || [ -z "$output_pdf" ]; then
+    err "[generate_quality_report_pdf] missing required arguments: input_md, output_pdf" && exit 1
+  fi
+
+  uv run python -c "from tgedr_pycommons.cicd.create_release_report import generate_report; generate_report('$input_md', '$output_pdf')"
 }
