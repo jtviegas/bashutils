@@ -48,9 +48,8 @@ export FILE_VARIABLES=${FILE_VARIABLES:-".variables"}
 export FILE_LOCAL_VARIABLES=${FILE_LOCAL_VARIABLES:-".local_variables"}
 export FILE_SECRETS=${FILE_SECRETS:-".secrets"}
 export INCLUDE_FILE=${INCLUDE_FILE:-".bashutils"}
-export BASHUTILS_URL=${BASHUTILS_URL:-"https://api.github.com/repos/jtviegas/bashutils/contents/bashutils-template.sh"}
+export BASHUTILS_URL=${BASHUTILS_URL:-"https://api.github.com/repos/jtviegas/bashutils/contents/.bashutils"}
 export BASHUTILS_CHECKSUM_URL=${BASHUTILS_CHECKSUM_URL:-"https://api.github.com/repos/jtviegas/bashutils/contents/.bashutils.checksum"}
-export BASHUTILS_SHA256=${BASHUTILS_SHA256:-""}
 export BASHUTILS_CHECK_INTERVAL_SECONDS=${BASHUTILS_CHECK_INTERVAL_SECONDS:-"86400"}
 
 get_file_mtime_epoch() {
@@ -71,6 +70,7 @@ download_bashutils_if_newer() {
   local bashutils="$this_folder/$INCLUDE_FILE"
   local bashutils_last_check="$this_folder/${INCLUDE_FILE}.last_check"
   local bashutils_checksum="$this_folder/${INCLUDE_FILE}.checksum"
+  local just_fetch="0"
   local now_epoch
   local last_check_epoch
   local elapsed
@@ -80,6 +80,7 @@ download_bashutils_if_newer() {
   local actual_sha256
   local expected_sha256
 
+  
   if [ -f "$bashutils" ] && [ -f "$bashutils_last_check" ]; then
     now_epoch=$(date +%s)
     if last_check_epoch="$(get_file_mtime_epoch "$bashutils_last_check")"; then
@@ -96,6 +97,9 @@ download_bashutils_if_newer() {
           ;;
       esac
     fi
+  else
+    info "[download_bashutils_if_newer] no $INCLUDE_FILE or ${INCLUDE_FILE}.last_check found - we will fetch it"
+    just_fetch="1"
   fi
 
   if ! command -v curl >/dev/null 2>&1; then
@@ -103,72 +107,63 @@ download_bashutils_if_newer() {
     return 1
   fi
 
-  if ! command -v sha256sum >/dev/null 2>&1 && ! command -v shasum >/dev/null 2>&1; then
-    err "[download_bashutils_if_newer] please install sha256sum or shasum to verify $INCLUDE_FILE"
+  if ! command -v sha256sum >/dev/null 2>&1; then
+    err "[download_bashutils_if_newer] please install sha256sum to verify $INCLUDE_FILE"
     return 1
   fi
 
-  # if [ -n "$BASHUTILS_SHA256" ]; then
-  #   expected_sha256="$BASHUTILS_SHA256"
-  # else
-  #   checksum_tmp="$(mktemp)"
-  #   if ! curl -fsSL "$BASHUTILS_CHECKSUM_URL" \
-  #     | python3 -c "import sys,json,base64; print(base64.b64decode(json.load(sys.stdin)['content']).decode())" \
-  #     > "$checksum_tmp"; then
-  #     err "[download_bashutils_if_newer] failed to download $(basename "$BASHUTILS_CHECKSUM_URL")"
-  #     rm -f "$checksum_tmp"
-  #     return 1
-  #   fi
-  #   # checksum file format: "<sha256> <space><space><optional *>filename"
-  #   expected_sha256="$(awk -v include_file="$INCLUDE_FILE" 'NF >= 2 && $1 ~ /^[a-fA-F0-9]{64}$/ && ($2 == include_file || $2 == "*" include_file) { print tolower($1); exit }' "$checksum_tmp")"
-  #   rm -f "$checksum_tmp"
-  #   if [ -z "$expected_sha256" ]; then
-  #     err "[download_bashutils_if_newer] invalid checksum file format from $(basename "$BASHUTILS_CHECKSUM_URL")"
-  #     return 1
-  #   fi
-  # fi
+  checksum_tmp="$(mktemp)"
+  if ! curl -fsSL "$BASHUTILS_CHECKSUM_URL" \
+    | python3 -c "import sys,json,base64; sys.stdout.buffer.write(base64.b64decode(json.load(sys.stdin)['content']))" \
+    > "$checksum_tmp"; then
+    err "[download_bashutils_if_newer] failed to download $(basename "$BASHUTILS_CHECKSUM_URL")"
+    rm -f "$checksum_tmp"
+    return 1
+  fi
+  expected_sha256=$(cat "$checksum_tmp" | awk '{print $1}')
+  info "[download_bashutils_if_newer] expected_sha256: $expected_sha256"
+  rm -f "$checksum_tmp"
 
-  # bashutils_tmp="$(mktemp)"
-  # if ! curl -fsSL "$BASHUTILS_URL" \
-  #     | python3 -c "import sys,json,base64; print(base64.b64decode(json.load(sys.stdin)['content']).decode())" \
-  #     > "$bashutils_tmp"; then
-  #   err "[download_bashutils_if_newer] failed to download $INCLUDE_FILE"
-  #   rm -f "$bashutils_tmp"
-  #   return 1
-  # fi
+  if [ "$just_fetch" -ne "1" ]; then
+      info "[download_bashutils_if_newer] checking existing $INCLUDE_FILE"
 
-  # did_remote_check=1
+      actual_sha256=$(cat "$bashutils_checksum" | awk '{print $1}')
+      info "[download_bashutils_if_newer] actual_sha256: $actual_sha256"
+      
+      if [ "$actual_sha256" != "$expected_sha256" ]; then
+        info "[download_bashutils_if_newer] $INCLUDE_FILE is outdated (actual: $actual_sha256, expected: $expected_sha256), updating it"
+        just_fetch="1"
+      else
+        info "[download_bashutils_if_newer] $INCLUDE_FILE is up to date"
+      fi
+  fi
 
-  # if [ -s "$bashutils_tmp" ]; then
-  #   if command -v sha256sum >/dev/null 2>&1; then
-  #     actual_sha256="$(sha256sum "$bashutils_tmp" | awk '{print $1}')"
-  #   elif command -v shasum >/dev/null 2>&1; then
-  #     actual_sha256="$(shasum -a 256 "$bashutils_tmp" | awk '{print $1}')"
-  #   else
-  #     err "[download_bashutils_if_newer] please install sha256sum or shasum to verify $INCLUDE_FILE"
-  #     rm -f "$bashutils_tmp"
-  #     return 1
-  #   fi
 
-  #   if [ "$actual_sha256" != "$expected_sha256" ]; then
-  #     err "[download_bashutils_if_newer] checksum verification failed for $INCLUDE_FILE"
-  #     rm -f "$bashutils_tmp"
-  #     return 1
-  #   fi
+  if [ "$just_fetch" -eq "1" ]; then
+    bashutils_tmp="$(mktemp)"
+    curl -fsSL "$BASHUTILS_URL" \
+      | python3 -c "import sys,json,base64; sys.stdout.buffer.write(base64.b64decode(json.load(sys.stdin)['content']))" \
+      > "$bashutils_tmp"
+    if [ ! "$?" -eq "0" ]; then
+      err "[download_bashutils_if_newer] failed to download $INCLUDE_FILE"
+      rm -f "$bashutils_tmp"
+      return 1
+    fi
+    info "[download_bashutils_if_newer] downloaded $INCLUDE_FILE to $bashutils_tmp"
+    actual_sha256="$(sha256sum "$bashutils_tmp" | awk '{print $1}')"
+    info "[download_bashutils_if_newer] actual_sha256: $actual_sha256"
 
-  #   if ! mv "$bashutils_tmp" "$bashutils"; then
-  #     err "[download_bashutils_if_newer] failed to replace $INCLUDE_FILE"
-  #     rm -f "$bashutils_tmp"
-  #     return 1
-  #   fi
-  #   info "[download_bashutils_if_newer] updated $INCLUDE_FILE"
-  # else
-  #   rm -f "$bashutils_tmp"
-  # fi
+    if [ "$actual_sha256" != "$expected_sha256" ]; then
+      info "[download_bashutils_if_newer] $INCLUDE_FILE checksum is not equal to the expected one (actual: $actual_sha256, expected: $expected_sha256), aborting update"
+      return 1
+    fi
 
-  # if [ "$did_remote_check" -eq 1 ]; then
-  #   touch "$bashutils_last_check" || warn "[download_bashutils_if_newer] failed to update last check marker; next run will perform a remote check"
-  # fi
+    mv "$bashutils_tmp" "$bashutils"
+    rm -f "$bashutils_tmp"
+    touch "$bashutils_last_check" || warn "[download_bashutils_if_newer] failed to update last check marker; next run will perform a remote check"
+    info "[download_bashutils_if_newer] updated $INCLUDE_FILE or ${INCLUDE_FILE}.last_check "
+  fi
+
 }
 
 # -------------------------------
