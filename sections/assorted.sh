@@ -119,7 +119,7 @@ download_function(){
 #   name: call_grafana_api
 #   purpose: makes an authenticated GET request to a Grafana API endpoint through a proxy/gateway,
 #            passing both an Azure bearer token and a Grafana service account token
-#   parameters: $1 (Azure OAuth2 access token), $2 (Grafana service account API token)
+#   parameters: $1 (Azure OAuth2 access token), $2 (Grafana service account API token), $3 (Grafana API URL)
 #   requires: curl
 ############################
 

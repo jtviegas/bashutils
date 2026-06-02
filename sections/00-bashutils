@@ -315,6 +315,8 @@ add_pypi_config(){
 ############################
 #   name: assert_uv_config
 #   purpose: assures that last version of 'uv' is present in the system
+#   parameters: none
+#   requires: curl, uv (installed if absent), this_folder
 ############################
 
 assert_uv_config(){
@@ -346,6 +348,8 @@ assert_uv_config(){
 ############################
 #   name: print_uuid
 #   purpose: prints a generated UUID
+#   parameters: none
+#   requires: uuidgen
 ############################
 
 print_uuid(){
@@ -365,6 +369,7 @@ print_uuid(){
 #   name: terraform_autodeploy
 #   purpose: automatically deploys terraform infrastructure
 #   parameters: $1 (terraform folder path)
+#   requires: terraform
 ############################
 terraform_autodeploy(){
   info "[terraform_autodeploy] ..."
@@ -390,6 +395,7 @@ terraform_autodeploy(){
 #   name: terraform_autodestroy
 #   purpose: automatically destroys terraform infrastructure
 #   parameters: $1 (terraform folder path)
+#   requires: terraform
 ############################
 
 terraform_autodestroy(){
@@ -418,6 +424,7 @@ terraform_autodestroy(){
 #   name: npm_deps
 #   purpose: installs npm dependencies in specified directory
 #   parameters: $1 (infrastructure directory)
+#   requires: npm
 ############################
 npm_deps(){
   info "[npm_deps|in] ($1)"
@@ -440,6 +447,7 @@ npm_deps(){
 #   name: npm_publish
 #   purpose: publishes npm package to registry
 #   parameters: $1 (registry), $2 (token), $3 (folder)
+#   requires: npm
 ############################
 
 npm_publish(){

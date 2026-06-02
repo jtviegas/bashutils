@@ -433,6 +433,12 @@ lint_check_ruff(){
   info "$msg"
 }
 
+############################
+#   name: lint_check_ruff_uv
+#   purpose: runs ruff linter in check mode (no auto-fix) on the project using uv
+#   parameters: none
+#   requires: uv (with ruff), this_folder
+############################
 lint_check_ruff_uv(){
   info "[lint_check_ruff_uv|in]"
   _pwd=`pwd`
@@ -485,6 +491,12 @@ poetry_pytest_unit(){
   info "$msg"
 }
 
+############################
+#   name: pytest_uv
+#   purpose: runs pytest unit tests via uv with coverage reporting (term-missing, html, xml) and JUnit XML output
+#   parameters: $1 (test directory, default: test), $2 (source directory for coverage, default: src)
+#   requires: uv (with pytest, pytest-cov), this_folder
+############################
 pytest_uv(){
   info "[pytest_uv|in] ($1, $2)"
 
@@ -564,6 +576,12 @@ python_poetry_print_coverage()
   return ${result}
 }
 
+############################
+#   name: test_print_coverage_uv
+#   purpose: prints a coverage report with missing lines and generates html + xml reports via uv
+#   parameters: none
+#   requires: uv (with coverage, and a .coverage data file already generated)
+############################
 test_print_coverage_uv()
 {
   info "[test_print_coverage_uv|in]"
@@ -600,6 +618,12 @@ python_poetry_check_coverage()
   info "[python_poetry_check_coverage|out] => $score"
 }
 
+############################
+#   name: test_coverage_check_uv
+#   purpose: asserts that total coverage meets a minimum threshold via uv; generates a coverage badge SVG; exits with error if below threshold
+#   parameters: $1 (minimum coverage percentage, integer, e.g. 80)
+#   requires: uv (with coverage, genbadge, and a .coverage data file already generated)
+############################
 test_coverage_check_uv()
 {
   info "[test_coverage_check_uv|in] ($1)"
@@ -640,6 +664,12 @@ poetry_build(){
   info "$msg"
 }
 
+############################
+#   name: build_uv
+#   purpose: cleans dist/ and builds the Python package using 'uv build'
+#   parameters: none
+#   requires: uv, this_folder
+############################
 build_uv(){
   info "[build_uv|in]"
 
@@ -691,6 +721,12 @@ poetry_publish_az(){
   info "$msg"
 }
 
+############################
+#   name: publish_pypi_uv
+#   purpose: publishes the built package distributions to PyPI using 'uv publish' with a token
+#   parameters: $1 (PyPI API token)
+#   requires: uv, this_folder
+############################
 publish_pypi_uv(){
   info "[publish_pypi_uv|in] (${1:0:7})"
 
@@ -768,6 +804,12 @@ sca_check_safety(){
   info "$msg"
 }
 
+############################
+#   name: sca_check_safety_uv
+#   purpose: runs a Software Composition Analysis (SCA) scan with the safety tool via uv to detect known vulnerabilities in dependencies; continues even if vulnerabilities are found (--continue-on-error)
+#   parameters: $1 (Safety CLI API key)
+#   requires: uv (with safety), this_folder
+############################
 sca_check_safety_uv(){
   info "[sca_check_safety_uv|in] (${1:0:7})"
   _pwd=`pwd`
@@ -816,6 +858,12 @@ sast_check_bandit(){
   info "$msg"
 }
 
+############################
+#   name: sast_check_bandit_uv
+#   purpose: runs a Static Application Security Testing (SAST) scan with bandit via uv to detect common security issues in Python source code
+#   parameters: $1 (source directory to scan recursively)
+#   requires: uv (with bandit), this_folder
+############################
 sast_check_bandit_uv(){
   info "[sast_check_bandit_uv|in] ($1)"
   _pwd=`pwd`
@@ -864,6 +912,12 @@ poetry_publish_pip(){
   info "$msg"
 }
 
+############################
+#   name: pyproj_report_header
+#   purpose: generates a markdown test report header with package name, version, timestamp, repository, branch, and commit ID read from pyproject.toml
+#   parameters: $1 (output markdown filename), $2 (repository name), $3 (branch name), $4 (commit ID)
+#   requires: uv (with tomllib), this_folder
+############################
 pyproj_report_header(){
   info "[pyproj_report_header|in] ($1)"
 
@@ -897,6 +951,12 @@ pyproj_report_header(){
   info "[pyproj_report_header|out]"
 }
 
+############################
+#   name: generate_pr_approvals_pdf
+#   purpose: generates a PDF report of PR approvals for a given repository branch using tgedr_pycommons
+#   parameters: $1 (repository name), $2 (branch name), $3 (output PDF file path)
+#   requires: uv (with tgedr_pycommons)
+############################
 generate_pr_approvals_pdf() {
   local repo="$1"
   local branch="$2"
@@ -909,6 +969,12 @@ generate_pr_approvals_pdf() {
   uv run python -c "from tgedr_pycommons.cicd.pr_approvals_github import generate_pr_approvals_pdf; generate_pr_approvals_pdf('$repo', '$branch', '$output_file')"
 }
 
+############################
+#   name: generate_quality_report_pdf
+#   purpose: converts a markdown quality report to a PDF file using tgedr_pycommons
+#   parameters: $1 (input markdown file path), $2 (output PDF file path)
+#   requires: uv (with tgedr_pycommons)
+############################
 generate_quality_report_pdf() {
   local input_md="$1"
   local output_pdf="$2"

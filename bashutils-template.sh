@@ -172,7 +172,8 @@ source_if_exists "$this_folder/$FILE_LOCAL_VARIABLES"
 source_if_exists "$this_folder/$FILE_SECRETS"
 
 # ---------- include bashutils ----------
-[ -z "$BASHUTILS_DONT_UPDATE" ] && download_bashutils_if_newer
+BASHUTILS_UPDATE=${BASHUTILS_UPDATE:-"0"}
+[ "$BASHUTILS_UPDATE" -eq "1" ] && download_bashutils_if_newer
 . "$this_folder/$INCLUDE_FILE"
 
 # <=== HEADER SECTION END  <===

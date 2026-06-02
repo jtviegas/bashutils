@@ -200,6 +200,12 @@ git_tag_and_push()
 }
 
 
+############################
+#   name: git_tag_and_push_auto_uv
+#   purpose: reads the project version from pyproject.toml via uv, then creates an annotated git tag on the latest commit and pushes all tags to remote
+#   parameters: none
+#   requires: uv (with tomllib), git, this_folder
+############################
 git_tag_and_push_auto_uv()
 {
   info "[git_tag_and_push_auto_uv|in]"
@@ -403,6 +409,12 @@ print_uuid(){
 
 
 
+############################
+#   name: collect_dot_git
+#   purpose: archives the .git directory of the project into a compressed tar archive
+#   parameters: $1 (output archive filename, default: git.tar.gz)
+#   requires: tar, this_folder
+############################
 collect_dot_git(){
   info "[collect_dot_git|in] ($1)"
   _pwd=`pwd`
@@ -418,6 +430,12 @@ collect_dot_git(){
   info "$msg"
 }
 
+############################
+#   name: create_release_documentation
+#   purpose: assembles release documentation artifacts (git archive, PR approval PDF, QA PDF) into a single directory and compresses it into a tar archive
+#   parameters: $1 (git archive tar file path), $2 (PR approvals PDF file path), $3 (QA report PDF file path), $4 (output target directory)
+#   requires: tar, this_folder
+############################
 create_release_documentation(){
   info "[create_release_documentation|in] ($1, $2, $3, $4)"
 
@@ -446,5 +464,69 @@ create_release_documentation(){
   local msg="[create_release_documentation|out] => ${result}"
   [[ ! "$result" -eq "0" ]] && info "$msg" && exit 1
   info "$msg"
+}
+
+############################
+#   name: function_report_wrapper
+#   purpose: wraps a command invocation, appending its stdout output to a report file with labelled start/end section markers; propagates the command's exit code
+#   parameters: $1 (report file path to append to), $2 (section label), $3+ (command and arguments to run)
+#   returns: exit code of the wrapped command
+############################
+function_report_wrapper(){
+  [ -z "$1" ] && { err "[function_report_wrapper] missing report path argument"; return 1; }
+  local report_path="$1"
+  shift
+  [ -z "$1" ] && { err "[function_report_wrapper] missing report section name argument"; return 1; }
+  local section_name="$1"
+  shift
+  [ "$#" -lt 1 ] && { err "[function_report_wrapper] missing command to run"; return 1; }
+
+  {
+    echo "## $section_name - section start"
+    echo
+    "$@"
+    local cmd_rc=$?
+    echo
+    echo "## $section_name - section end"
+    echo
+    exit "$cmd_rc"
+  } | tee -a "$report_path"
+
+  local result=${PIPESTATUS[0]}
+  return "$result"
+}
+
+############################
+#   name: generate_pr_approvals_md
+#   purpose: generates a markdown report of PR approvals for a given repository branch using tgedr_pycommons
+#   parameters: $1 (repository name), $2 (branch name), $3 (output markdown file path)
+#   requires: uv (with tgedr_pycommons)
+############################
+generate_pr_approvals_md() {
+  local repo="$1"
+  local branch="$2"
+  local output_file="$3"
+
+  if [ -z "$repo" ] || [ -z "$branch" ] || [ -z "$output_file" ]; then
+    err "[generate_pr_approvals_md] missing required arguments: repo, branch, output_file" && exit 1
+  fi
+
+  uv run python -c "from tgedr_pycommons.cicd.pr_report_generator import generate_pr_approvals_md; generate_pr_approvals_md('$repo', '$branch', '$output_file')"
+}
+
+############################
+#   name: generate_pdf_from_md
+#   purpose: converts a markdown file to a PDF using tgedr_pycommons
+#   parameters: $1 (input markdown file path), $2 (output PDF file path)
+#   requires: uv (with tgedr_pycommons)
+############################
+generate_pdf_from_md() {
+
+  [ -z "$1" ] && { err "[generate_pdf_from_md] missing input_md argument"; return 1; }
+  local input_md="$1"
+  [ -z "$2" ] && { err "[generate_pdf_from_md] missing output_pdf argument"; return 1; }
+  local output_pdf="$2"
+
+  uv run python -c "from tgedr_pycommons.cicd.markdown_to_pdf import convert; convert('$input_md', '$output_pdf')"
 }
 
