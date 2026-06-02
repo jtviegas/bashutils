@@ -867,7 +867,7 @@ create_release_documentation(){
   _pwd=`pwd`
   cd "$this_folder"
 
-  rm -f "$TARGET_DIR/*"
+  rm -f $TARGET_DIR
   mkdir -p "$TARGET_DIR"
   mv "$GIT_TAR" "$TARGET_DIR/"
   mv "$PRS_PDF" "$TARGET_DIR/"
