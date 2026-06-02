@@ -119,7 +119,7 @@ download_function(){
 #   name: call_grafana_api
 #   purpose: makes an authenticated GET request to a Grafana API endpoint through a proxy/gateway,
 #            passing both an Azure bearer token and a Grafana service account token
-#   parameters: $1 (Azure OAuth2 access token), $2 (Grafana service account API token)
+#   parameters: $1 (Azure OAuth2 access token), $2 (Grafana service account API token), $3 (Grafana API URL)
 #   requires: curl
 ############################
 
@@ -616,6 +616,12 @@ git_tag_and_push()
 }
 
 
+############################
+#   name: git_tag_and_push_auto_uv
+#   purpose: reads the project version from pyproject.toml via uv, then creates an annotated git tag on the latest commit and pushes all tags to remote
+#   parameters: none
+#   requires: uv (with tomllib), git, this_folder
+############################
 git_tag_and_push_auto_uv()
 {
   info "[git_tag_and_push_auto_uv|in]"
@@ -819,6 +825,12 @@ print_uuid(){
 
 
 
+############################
+#   name: collect_dot_git
+#   purpose: archives the .git directory of the project into a compressed tar archive
+#   parameters: $1 (output archive filename, default: git.tar.gz)
+#   requires: tar, this_folder
+############################
 collect_dot_git(){
   info "[collect_dot_git|in] ($1)"
   _pwd=`pwd`
@@ -834,6 +846,12 @@ collect_dot_git(){
   info "$msg"
 }
 
+############################
+#   name: create_release_documentation
+#   purpose: assembles release documentation artifacts (git archive, PR approval PDF, QA PDF) into a single directory and compresses it into a tar archive
+#   parameters: $1 (git archive tar file path), $2 (PR approvals PDF file path), $3 (QA report PDF file path), $4 (output target directory)
+#   requires: tar, this_folder
+############################
 create_release_documentation(){
   info "[create_release_documentation|in] ($1, $2, $3, $4)"
 
@@ -862,6 +880,70 @@ create_release_documentation(){
   local msg="[create_release_documentation|out] => ${result}"
   [[ ! "$result" -eq "0" ]] && info "$msg" && exit 1
   info "$msg"
+}
+
+############################
+#   name: function_report_wrapper
+#   purpose: wraps a command invocation, appending its stdout output to a report file with labelled start/end section markers; propagates the command's exit code
+#   parameters: $1 (report file path to append to), $2 (section label), $3+ (command and arguments to run)
+#   returns: exit code of the wrapped command
+############################
+function_report_wrapper(){
+  [ -z "$1" ] && { err "[function_report_wrapper] missing report path argument"; return 1; }
+  local report_path="$1"
+  shift
+  [ -z "$1" ] && { err "[function_report_wrapper] missing report section name argument"; return 1; }
+  local section_name="$1"
+  shift
+  [ "$#" -lt 1 ] && { err "[function_report_wrapper] missing command to run"; return 1; }
+
+  {
+    echo "## $section_name - section start"
+    echo
+    "$@"
+    local cmd_rc=$?
+    echo
+    echo "## $section_name - section end"
+    echo
+    exit "$cmd_rc"
+  } | tee -a "$report_path"
+
+  local result=${PIPESTATUS[0]}
+  return "$result"
+}
+
+############################
+#   name: generate_pr_approvals_md
+#   purpose: generates a markdown report of PR approvals for a given repository branch using tgedr_pycommons
+#   parameters: $1 (repository name), $2 (branch name), $3 (output markdown file path)
+#   requires: uv (with tgedr_pycommons)
+############################
+generate_pr_approvals_md() {
+  local repo="$1"
+  local branch="$2"
+  local output_file="$3"
+
+  if [ -z "$repo" ] || [ -z "$branch" ] || [ -z "$output_file" ]; then
+    err "[generate_pr_approvals_md] missing required arguments: repo, branch, output_file" && exit 1
+  fi
+
+  uv run python -c "from tgedr_pycommons.cicd.pr_report_generator import generate_pr_approvals_md; generate_pr_approvals_md('$repo', '$branch', '$output_file')"
+}
+
+############################
+#   name: generate_pdf_from_md
+#   purpose: converts a markdown file to a PDF using tgedr_pycommons
+#   parameters: $1 (input markdown file path), $2 (output PDF file path)
+#   requires: uv (with tgedr_pycommons)
+############################
+generate_pdf_from_md() {
+
+  [ -z "$1" ] && { err "[generate_pdf_from_md] missing input_md argument"; return 1; }
+  local input_md="$1"
+  [ -z "$2" ] && { err "[generate_pdf_from_md] missing output_pdf argument"; return 1; }
+  local output_pdf="$2"
+
+  uv run python -c "from tgedr_pycommons.cicd.markdown_to_pdf import convert; convert('$input_md', '$output_pdf')"
 }
 
 
@@ -1740,6 +1822,12 @@ lint_check_ruff(){
   info "$msg"
 }
 
+############################
+#   name: lint_check_ruff_uv
+#   purpose: runs ruff linter in check mode (no auto-fix) on the project using uv
+#   parameters: none
+#   requires: uv (with ruff), this_folder
+############################
 lint_check_ruff_uv(){
   info "[lint_check_ruff_uv|in]"
   _pwd=`pwd`
@@ -1792,6 +1880,12 @@ poetry_pytest_unit(){
   info "$msg"
 }
 
+############################
+#   name: pytest_uv
+#   purpose: runs pytest unit tests via uv with coverage reporting (term-missing, html, xml) and JUnit XML output
+#   parameters: $1 (test directory, default: test), $2 (source directory for coverage, default: src)
+#   requires: uv (with pytest, pytest-cov), this_folder
+############################
 pytest_uv(){
   info "[pytest_uv|in] ($1, $2)"
 
@@ -1871,6 +1965,12 @@ python_poetry_print_coverage()
   return ${result}
 }
 
+############################
+#   name: test_print_coverage_uv
+#   purpose: prints a coverage report with missing lines and generates html + xml reports via uv
+#   parameters: none
+#   requires: uv (with coverage, and a .coverage data file already generated)
+############################
 test_print_coverage_uv()
 {
   info "[test_print_coverage_uv|in]"
@@ -1907,6 +2007,12 @@ python_poetry_check_coverage()
   info "[python_poetry_check_coverage|out] => $score"
 }
 
+############################
+#   name: test_coverage_check_uv
+#   purpose: asserts that total coverage meets a minimum threshold via uv; generates a coverage badge SVG; exits with error if below threshold
+#   parameters: $1 (minimum coverage percentage, integer, e.g. 80)
+#   requires: uv (with coverage, genbadge, and a .coverage data file already generated)
+############################
 test_coverage_check_uv()
 {
   info "[test_coverage_check_uv|in] ($1)"
@@ -1947,6 +2053,12 @@ poetry_build(){
   info "$msg"
 }
 
+############################
+#   name: build_uv
+#   purpose: cleans dist/ and builds the Python package using 'uv build'
+#   parameters: none
+#   requires: uv, this_folder
+############################
 build_uv(){
   info "[build_uv|in]"
 
@@ -1998,6 +2110,12 @@ poetry_publish_az(){
   info "$msg"
 }
 
+############################
+#   name: publish_pypi_uv
+#   purpose: publishes the built package distributions to PyPI using 'uv publish' with a token
+#   parameters: $1 (PyPI API token)
+#   requires: uv, this_folder
+############################
 publish_pypi_uv(){
   info "[publish_pypi_uv|in] (${1:0:7})"
 
@@ -2075,6 +2193,12 @@ sca_check_safety(){
   info "$msg"
 }
 
+############################
+#   name: sca_check_safety_uv
+#   purpose: runs a Software Composition Analysis (SCA) scan with the safety tool via uv to detect known vulnerabilities in dependencies; continues even if vulnerabilities are found (--continue-on-error)
+#   parameters: $1 (Safety CLI API key)
+#   requires: uv (with safety), this_folder
+############################
 sca_check_safety_uv(){
   info "[sca_check_safety_uv|in] (${1:0:7})"
   _pwd=`pwd`
@@ -2123,6 +2247,12 @@ sast_check_bandit(){
   info "$msg"
 }
 
+############################
+#   name: sast_check_bandit_uv
+#   purpose: runs a Static Application Security Testing (SAST) scan with bandit via uv to detect common security issues in Python source code
+#   parameters: $1 (source directory to scan recursively)
+#   requires: uv (with bandit), this_folder
+############################
 sast_check_bandit_uv(){
   info "[sast_check_bandit_uv|in] ($1)"
   _pwd=`pwd`
@@ -2171,6 +2301,12 @@ poetry_publish_pip(){
   info "$msg"
 }
 
+############################
+#   name: pyproj_report_header
+#   purpose: generates a markdown test report header with package name, version, timestamp, repository, branch, and commit ID read from pyproject.toml
+#   parameters: $1 (output markdown filename), $2 (repository name), $3 (branch name), $4 (commit ID)
+#   requires: uv (with tomllib), this_folder
+############################
 pyproj_report_header(){
   info "[pyproj_report_header|in] ($1)"
 
@@ -2204,6 +2340,12 @@ pyproj_report_header(){
   info "[pyproj_report_header|out]"
 }
 
+############################
+#   name: generate_pr_approvals_pdf
+#   purpose: generates a PDF report of PR approvals for a given repository branch using tgedr_pycommons
+#   parameters: $1 (repository name), $2 (branch name), $3 (output PDF file path)
+#   requires: uv (with tgedr_pycommons)
+############################
 generate_pr_approvals_pdf() {
   local repo="$1"
   local branch="$2"
@@ -2216,6 +2358,12 @@ generate_pr_approvals_pdf() {
   uv run python -c "from tgedr_pycommons.cicd.pr_approvals_github import generate_pr_approvals_pdf; generate_pr_approvals_pdf('$repo', '$branch', '$output_file')"
 }
 
+############################
+#   name: generate_quality_report_pdf
+#   purpose: converts a markdown quality report to a PDF file using tgedr_pycommons
+#   parameters: $1 (input markdown file path), $2 (output PDF file path)
+#   requires: uv (with tgedr_pycommons)
+############################
 generate_quality_report_pdf() {
   local input_md="$1"
   local output_pdf="$2"
