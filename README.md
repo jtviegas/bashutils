@@ -1,28 +1,14 @@
 # bashutils
 bash scripting utilities include file 
 
-## usage
+## use case
 
-### option a) 
+Whether in a new project or in an existing one, we assume you want to use a bash script, `helper.sh`, 
+to provide bash functions that can be used both in ci-cd/devops pipelines/workflows and in our local systems.
 
-include the file in your bash script:
+This way we intend to shift away from chaotic one-off commands and functions and leverage reusable solutions and patterns across distinct projects.
 
-`. ${this_folder}/.bashutils`
-
-where `this_folder` is the directory containing your script, resolved at runtime with:
-
-```bash
-this_folder="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
-```
-
-you can also now add the rest of the plumbing, found in the `helper.sh` script below, to be able to update the `.bashutils` file seamlessly.
-
-### option b) 
-
-create a new `helper.sh` script for your project that already includes and updastes `.bashutils` (see [one-liner setup](#one-liner-setup))
-
-
-## one-liner setup
+### one-liner setup
 
 download a helper script for a new project with:
 
@@ -49,13 +35,38 @@ gh api repos/jtviegas/bashutils/contents/bashutils-template.sh \
 
 the downloaded file is a regular bash script that you can rename and customize for your project.
 
-- it creates `.variables`, `.local_variables` and `.secrets` next to the script when needed
+### usage
+
+- if non-existent, it creates the files `.variables` (should be version-managed), `.local_variables` and `.secrets` (these 2 are for personal development purposes and should NOT be version-managed) next to the script
 - it downloads `.bashutils` on the first run
 - it provides a set of logging functions
 - on later runs it checks for updates at most once per day and replaces the local `.bashutils` from `master` only when newer
 - every downloaded `.bashutils` file is verified with SHA256 using `.bashutils.checksum`
-- you can add your own functions directly to the downloaded script and keep reusing the shared `.bashutils`
-
+- you can now reuse `.bashutils` functions by referencing functions in your own `.helper.sh`:
+  ```bash
+  case "$1" in
+    reqs)
+      reqs
+      ;;
+    verify_env)
+      verify_env
+      ;;
+    collect_dot_git)
+      collect_dot_git "$2"
+      ;;
+    databricks_bundle_deploy)
+      databricks_bundle_deploy "$2" "$3"
+      ;;
+    databricks_bundle_destroy)
+      databricks_bundle_destroy "$2" "$3"
+      ;;
+    *)
+      usage
+      ;;
+  esac
+  ```
+- you can also add your own functions directly to the `.helper.sh` script
+- you are encouraged to submit PR's to contribute with new functionality to `.bashutils`
 
 ## contributing
 
